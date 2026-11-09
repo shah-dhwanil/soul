@@ -1,0 +1,15 @@
+from langgraph.checkpoint.memory import MemorySaver
+
+from agent.graph.build import build_turn_graph
+from agent.graph.nodes import route_memory
+from agent.graph.state import TurnState
+
+
+def test_route_memory_when_required() -> None:
+    assert route_memory(TurnState(memory_required=True)) == "retrieve_memory"
+    assert route_memory(TurnState(memory_required=False)) == "assemble_and_generate"
+
+
+def test_graph_compiles_with_memory_saver() -> None:
+    graph = build_turn_graph(checkpointer=MemorySaver())
+    assert graph is not None

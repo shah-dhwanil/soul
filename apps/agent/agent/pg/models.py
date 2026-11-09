@@ -50,7 +50,9 @@ class Thread(BaseModel):
         onupdate=func.now(),
         nullable=False,
     )
-    status: Mapped[ThreadStatus] = mapped_column(nullable=False, default="active")
+    status: Mapped[ThreadStatus] = mapped_column(
+        nullable=False, default=ThreadStatus.ACTIVE
+    )
     
     __table_args__ = (
         Index(
@@ -68,7 +70,9 @@ class Conversation(BaseModel):
     thread_id: Mapped[UUID] = mapped_column(nullable=False)
     user_message: Mapped[str] = mapped_column(nullable=False)
     agent_response: Mapped[str] = mapped_column(nullable=False)
-    final_state: Mapped[dict[str,Any]] = mapped_column(JSONB,nullable=False, default=False)
+    final_state: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, default=dict
+    )
     started_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),

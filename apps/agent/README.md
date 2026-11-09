@@ -29,6 +29,17 @@ cd apps/agent
 uv run python main.py
 ```
 
+## HTTP API
+
+```bash
+cd apps/agent
+uv run uvicorn main:app --reload
+```
+
+`POST /v1/chat` with `{"user_id": "...", "message": "..."}` runs the LangGraph turn pipeline (Clef decisions, optional Graphiti retrieval, Groq reply). Each graph invoke uses a new LangGraph `thread_id` (`turn_id`); Postgres `thread` rows group conversations until Clef signals a split.
+
+Required env: `DATABASE_URL` (asyncpg), `DATABASE__CHECKPOINTER_DATABASE_URL` (psycopg), `GROQ_API_KEY`, `GROQ__AGENT_MODEL`, `CF_ACCOUNT_ID`, `CF_AI_API_TOKEN`, plus Graphiti vars for memory retrieval.
+
 ## Graphiti memory ingestion
 
 Ingestion uses Graphiti **0.31.2**, minimized prompts in [`graphiti_prompts/`](../../graphiti_prompts/), Groq (`GRAPHITI_LLM_MODEL`, default `openai/gpt-oss-120b`), and Jina `jina-embeddings-v3` at 1024 dimensions against Aura Neo4j (`NEO4J_DATABASE` must match your instance).
