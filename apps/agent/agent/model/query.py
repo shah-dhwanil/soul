@@ -2,15 +2,17 @@ import json
 import re
 from typing import Any
 
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_groq import ChatGroq
 
 from agent.config import Settings
 from agent.history import ChatTurn
+from agent.persona import WrenPromptContext, render_wren_system_prompt
 
 
 class QueryLLM:
     def __init__(self, settings: Settings) -> None:
+        self._settings = settings
         self._llm = ChatGroq(
             api_key=settings.groq_api_key,
             model=settings.groq_agent_model,
@@ -37,7 +39,7 @@ class QueryLLM:
         )
         response = await self._llm.ainvoke(
             [
-                SystemMessage(content="Reply with JSON only: [\"query\", ...]"),
+                SystemMessage(content='Reply with JSON only: ["query", ...]'),
                 HumanMessage(content=prompt),
             ]
         )
@@ -57,26 +59,24 @@ class QueryLLM:
         self,
         current_chat: str,
         chat_history: list[ChatTurn],
-        memories: list[dict[str, Any]],
         *,
-        tone_hint: str | None = None,
+        persona: WrenPromptContext,
     ) -> str:
-        memory_block = "\n".join(
-            f"- {m.get('fact', m)}" for m in memories
-        ) or "(no memories retrieved)"
-        tone = tone_hint or "warm and supportive"
-        system = (
-            "You are Wren, a close friend the user can talk things through with. "
-            f"Target tone: {tone}.\n"
-            f"Relevant memories:\n{memory_block}\n"
-            "Reply in one or two short paragraphs. Do not use bullet lists."
-        )
-        messages: list[SystemMessage | HumanMessage] = [SystemMessage(content=system)]
+        system = render_wren_system_prompt(persona)
+        messages: list[SystemMessage | HumanMessage | AIMessage] = [
+            SystemMessage(content=system),
+        ]
         for turn in chat_history:
             messages.append(HumanMessage(content=turn.user_message))
-            messages.append(
-                HumanMessage(content=f"(assistant previously said: {turn.agent_response})")
+            messages.append(AIMessage(content=turn.agent_response))
+        messages.append(
+            HumanMessage(
+                content=(
+                    "Reply as Wren to the user's latest message below. "
+                    "Use 1–3 short bubbles separated by blank lines if needed.\n\n"
+                    f"{current_chat}"
+                )
             )
-        messages.append(HumanMessage(content=current_chat))
+        )
         response = await self._gen.ainvoke(messages)
         return str(response.content).strip()

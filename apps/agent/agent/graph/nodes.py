@@ -6,6 +6,7 @@ from langchain_core.runnables import RunnableConfig
 from agent.graph.deps import GraphDeps, deps_from_config
 from agent.graph.state import TurnState
 from agent.history import ChatTurn
+from agent.persona.context import prompt_context_from_turn
 
 
 async def classify_parallel(state: TurnState, config: RunnableConfig) -> TurnState:
@@ -92,18 +93,16 @@ async def retrieve_memory(state: TurnState, config: RunnableConfig) -> TurnState
 
 async def assemble_and_generate(state: TurnState, config: RunnableConfig) -> TurnState:
     deps = deps_from_config(config)
-    raw = (state.get("decisions") or {}).get("raw") or {}
-    answers = raw.get("answers") or {}
-    agent_emotion = answers.get("agent_emotion", {})
-    tone_hint = None
-    if isinstance(agent_emotion, dict) and agent_emotion.get("label"):
-        tone_hint = str(agent_emotion["label"])
-
+    crisis = deps.settings.crisis_resources or None
+    persona = prompt_context_from_turn(
+        decisions=state.get("decisions"),
+        memories=state.get("memories") or [],
+        configured_resources=crisis,
+    )
     reply = await deps.query_llm.generate_response(
         state["user_message"],
         state.get("generation_history") or [],
-        state.get("memories") or [],
-        tone_hint=tone_hint,
+        persona=persona,
     )
     return TurnState(
         reply=reply,

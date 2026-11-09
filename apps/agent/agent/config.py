@@ -37,6 +37,11 @@ class Settings(BaseSettings):
     thread_continue_threshold: float = 0.5
     memory_search_timeout_seconds: float = 8.0
     memory_num_results: int = 5
+    crisis_resources: str = Field(
+        default="",
+        validation_alias="CRISIS_RESOURCES",
+        alias="CRISIS_RESOURCES",
+    )
 
 
 @lru_cache
