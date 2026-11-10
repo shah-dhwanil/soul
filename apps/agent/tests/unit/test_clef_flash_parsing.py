@@ -8,7 +8,8 @@ from agent.decision_parsing import (
 CLEF_FLASH_GUJARATI_TURN = {
     "model": "clef-flash",
     "answers": {
-        "thread_continue": {"type": "noul", "noul": 0.1691},
+        "thread_continue": {"type": "noul", "noul": 0.85},
+        "recent_context_required": {"type": "noul", "noul": 0.1691},
         "memory_required": {"type": "noul", "noul": 0.147},
         "user_emotion": {
             "type": "score",
@@ -51,11 +52,9 @@ CLEF_FLASH_GUJARATI_TURN = {
 
 
 def test_casual_greeting_does_not_inject_or_require_memory() -> None:
-    inject, split, memory = parse_thread_and_memory(
-        CLEF_FLASH_GUJARATI_TURN, continue_threshold=0.5
-    )
+    inject, split, memory = parse_thread_and_memory(CLEF_FLASH_GUJARATI_TURN)
     assert inject is False
-    assert split is True
+    assert split is False
     assert memory is False
 
 

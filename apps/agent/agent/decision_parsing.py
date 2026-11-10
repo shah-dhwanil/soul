@@ -51,23 +51,30 @@ def clef_score_label(answer: Any) -> str | None:
 
 
 def parse_thread_and_memory(
-    clef_result: dict[str, Any], *, continue_threshold: float = 0.5
+    clef_result: dict[str, Any],
+    *,
+    inject_threshold: float = 0.5,
+    split_threshold: float = 0.2,
+    memory_threshold: float = 0.5,
 ) -> tuple[bool, bool, bool]:
     """Return inject_previous_chat, split_thread, memory_required."""
     answers = clef_result.get("answers") or {}
     thread_answer = answers.get("thread_continue", {})
+    recent_answer = answers.get("recent_context_required", {})
     memory_answer = answers.get("memory_required", {})
 
-    p_thread = _noul_yes_probability(thread_answer)
+    p_continue = _noul_yes_probability(thread_answer)
+    p_recent = _noul_yes_probability(recent_answer)
     p_memory = _noul_yes_probability(memory_answer)
-    needs_history = p_thread >= continue_threshold
-    inject_previous_chat = needs_history
-    split_thread = not needs_history
-    memory_required = p_memory >= continue_threshold
+    inject_previous_chat = p_recent >= inject_threshold
+    split_thread = p_continue < split_threshold
+    memory_required = p_memory >= memory_threshold
 
     logger.info(
-        "Clef parse: p_thread=%.4f p_memory=%.4f inject=%s split=%s memory=%s",
-        p_thread,
+        "Clef parse: p_continue=%.4f p_recent=%.4f p_memory=%.4f "
+        "inject=%s split=%s memory=%s",
+        p_continue,
+        p_recent,
         p_memory,
         inject_previous_chat,
         split_thread,

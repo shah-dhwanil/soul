@@ -22,8 +22,23 @@ class DecisionModel:
             "thread_continue": {
                 "type": "noul",
                 "instructions": (
-                    "Does the current chat require context from chat history to "
-                    "generate a good reply — i.e. is it related to recent chats?"
+                    "Is the user's latest message part of the same ongoing "
+                    "conversation as the recent turns above (same chat session, "
+                    "follow-up, small talk, or callback), rather than a clearly "
+                    "unrelated new topic or explicit fresh start?"
+                ),
+            }
+        }
+
+    @staticmethod
+    def recent_context_required_question() -> dict[str, Any]:
+        return {
+            "recent_context_required": {
+                "type": "noul",
+                "instructions": (
+                    "Would a good reply depend on specific details in the "
+                    "recent turns above (references, follow-ups, unresolved "
+                    "thread)?"
                 ),
             }
         }
@@ -78,6 +93,7 @@ class DecisionModel:
     def default_questions() -> dict[str, Any]:
         merged: dict[str, Any] = {}
         merged.update(DecisionModel.thread_continue_question())
+        merged.update(DecisionModel.recent_context_required_question())
         merged.update(DecisionModel.is_memory_required_question())
         merged.update(DecisionModel.analyze_user_chat())
         merged.update(DecisionModel.agent_emotion())
@@ -94,7 +110,9 @@ class DecisionModel:
         raw = await self._client.aevaluate(state=state, questions=payload)
         inject, split, memory = parse_thread_and_memory(
             raw,
-            continue_threshold=self._settings.thread_continue_threshold,
+            inject_threshold=self._settings.thread_inject_threshold,
+            split_threshold=self._settings.thread_split_threshold,
+            memory_threshold=self._settings.thread_inject_threshold,
         )
         return {
             "raw": raw,

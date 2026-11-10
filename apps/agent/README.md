@@ -30,6 +30,18 @@ Required env: `DATABASE_URL` (e.g. `postgresql+asyncpg://...`), `DATABASE__CHECK
 
 Run migrations before first use: `cd apps/agent && uv run alembic upgrade head`.
 
+### Thread split / history injection (Clef)
+
+Clef asks two separate noul questions: **same session** (`thread_continue`, controls DB thread rotation) and **recent context** (`recent_context_required`, controls prompt history). Tune with:
+
+| Setting | Default | Meaning |
+| --- | --- | --- |
+| `THREAD_INJECT_THRESHOLD` | `0.5` | Inject recent turns when `recent_context_required` ≥ threshold |
+| `THREAD_SPLIT_THRESHOLD` | `0.2` | Rotate thread when `thread_continue` (same session) **below** threshold |
+| `MIN_TURNS_BEFORE_SPLIT` | `2` | Ignore split signal until the thread has at least this many stored turns |
+
+Log lines `Clef parse: p_continue=... p_recent=...` help tune thresholds on real chats.
+
 ## End-to-end eval (synthetic + LLM judge)
 
 Synthetic scenarios live in [`agent/evals/scenarios.py`](agent/evals/scenarios.py). Each turn is run through the real turn pipeline, then scored by a Groq judge plus deterministic checks (banned phrases, question budget).

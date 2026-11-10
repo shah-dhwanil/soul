@@ -47,12 +47,28 @@ async def apply_thread_policy(state: TurnState, config: RunnableConfig) -> TurnS
     new_thread = False
     updated_db_thread = state["db_thread_id"]
 
-    if state.get("split_thread"):
-        rows = await repo.list_by_thread(
+    split_requested = bool(state.get("split_thread"))
+    rows_for_split: list = []
+    if split_requested:
+        rows_for_split = await repo.list_by_thread(
             db_thread_id, limit=settings.split_generation_history_limit
         )
-        generation = [ChatTurn.from_conversation(r) for r in rows]
-        if rows:
+
+    split_thread = (
+        split_requested
+        and len(rows_for_split) >= settings.min_turns_before_split
+    )
+    if split_requested and not split_thread:
+        logger.info(
+            "thread_policy suppressed split turn=%s turns_in_thread=%d min=%d",
+            state.get("turn_id"),
+            len(rows_for_split),
+            settings.min_turns_before_split,
+        )
+
+    if split_thread:
+        generation = [ChatTurn.from_conversation(r) for r in rows_for_split]
+        if rows_for_split:
             previous_id = state["db_thread_id"]
             new_id = await deps.get_thread_service().rotate(state["user_id"], db_thread_id)
             updated_db_thread = str(new_id)
