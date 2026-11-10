@@ -1,15 +1,13 @@
-"""Wire the minimized prompts in ``graphiti_prompts/`` into Graphiti via LLMPromptOverrides."""
+"""Wire minimized prompts in ``agent.graphiti.prompts`` into Graphiti via LLMPromptOverrides."""
 
 import importlib
-import sys
 from collections.abc import Callable
-from pathlib import Path
 from typing import Any
 
 from graphiti_core.llm_client.prompt_config import LLMPromptOverrides
 from graphiti_core.prompts.models import ChatPrompt
 
-# group name -> module in graphiti_prompts (eval prompts are intentionally not overridden)
+# group name -> module under agent.graphiti.prompts (eval prompts are not overridden)
 _GROUPS = (
     "extract_nodes",
     "dedupe_nodes",
@@ -19,8 +17,6 @@ _GROUPS = (
     "summarize_nodes",
     "summarize_sagas",
 )
-
-_REPO_ROOT = Path(__file__).resolve().parents[5]
 
 
 def _as_override(fn: Callable[[dict[str, Any]], list]) -> Callable[[dict[str, Any]], ChatPrompt]:
@@ -34,12 +30,9 @@ def _as_override(fn: Callable[[dict[str, Any]], list]) -> Callable[[dict[str, An
 
 def build_prompt_overrides() -> LLMPromptOverrides:
     """Build LLMPromptOverrides from the minimized prompt modules."""
-    if str(_REPO_ROOT) not in sys.path:
-        sys.path.insert(0, str(_REPO_ROOT))
-
     groups: dict[str, Any] = {}
     for group in _GROUPS:
-        module = importlib.import_module(f"graphiti_prompts.{group}")
+        module = importlib.import_module(f"agent.graphiti.prompts.{group}")
         nested_cls = getattr(LLMPromptOverrides, "".join(p.capitalize() for p in group.split("_")))
         groups[group] = nested_cls(
             **{name: _as_override(fn) for name, fn in module.versions.items()}

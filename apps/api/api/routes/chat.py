@@ -1,7 +1,7 @@
 from fastapi import APIRouter, BackgroundTasks, Request
 
-from agent.api.deps import TurnServiceDep
-from agent.api.schemas import ChatRequest, ChatResponse
+from api.deps import TurnServiceDep
+from api.schemas import ChatRequest, ChatResponse
 
 router = APIRouter(tags=["chat"])
 

@@ -1,6 +1,6 @@
 # Agent
 
-LangGraph chat agent backed by Groq.
+LangGraph chat agent library: turn graph, Clef decisions, Graphiti memory, and persona prompts.
 
 ## Gradio test UI
 
@@ -22,21 +22,9 @@ DATABASE__CHECKPOINTER_DATABASE_URL=postgresql://USER:PASSWORD@HOST/DB?sslmode=r
 
 LangGraph checkpoint tables use **psycopg** (`postgresql://…`), not asyncpg. On first run the app calls `AsyncPostgresSaver.setup()` to create migration tables. Canonical chat history for production should still live in your app database; checkpoints are for graph durability and replay.
 
-Alternatively:
-
-```bash
-cd apps/agent
-uv run python main.py
-```
-
 ## HTTP API
 
-```bash
-cd apps/agent
-uv run uvicorn main:app --reload
-```
-
-`POST /v1/chat` with `{"user_id": "...", "message": "..."}` runs the LangGraph turn pipeline (Clef decisions, optional Graphiti retrieval, Groq reply). Each graph invoke uses a new LangGraph `thread_id` (`turn_id`); Postgres `thread` rows group conversations until Clef signals a split.
+The FastAPI app lives in the separate [`soul-api`](../api) package (`apps/api`). See [apps/api/README.md](../api/README.md).
 
 Required env: `DATABASE_URL` (e.g. `postgresql+asyncpg://...`), `DATABASE__CHECKPOINTER_DATABASE_URL` (psycopg, for LangGraph), `GROQ_API_KEY`, `GROQ__AGENT_MODEL`, `CF_ACCOUNT_ID`, `CF_AI_API_TOKEN`, plus Graphiti vars for memory retrieval.
 
@@ -58,7 +46,7 @@ Live full suite (costs Clef + Groq + DB): `uv run pytest tests/evals -m eval -q`
 
 ## Graphiti memory ingestion
 
-Ingestion uses Graphiti **0.31.2**, minimized prompts in [`graphiti_prompts/`](../../graphiti_prompts/), Groq (`GRAPHITI_LLM_MODEL`, default `openai/gpt-oss-120b`), and Jina `jina-embeddings-v3` at 1024 dimensions against Aura Neo4j (`NEO4J_DATABASE` must match your instance).
+Ingestion uses Graphiti **0.31.2**, minimized prompts in [`agent/graphiti/prompts/`](agent/graphiti/prompts/), Groq (`GRAPHITI_LLM_MODEL`, default `openai/gpt-oss-120b`), and Jina `jina-embeddings-v3` at 1024 dimensions against Aura Neo4j (`NEO4J_DATABASE` must match your instance).
 
 Episode text is built with [`build_episode_body`](agent/graphiti/episode.py): user lines only, with selective `Assistant asked:` context for short replies and explicit replies—never a Wren Person node. Pass [`CUSTOM_EXTRACTION_INSTRUCTIONS`](agent/graphiti/episode.py) as `custom_extraction_instructions` on `add_episode`.
 
@@ -71,6 +59,8 @@ uv run pytest tests/test_ontology.py -q
 Required env for workers: `GROQ_API_KEY`, `JINA_API_KEY`, `NEO4J_URI`, `NEO4J_USERNAME`, `NEO4J_PASSWORD`.
 
 ### Async memory outbox (in-process worker)
+
+The memory worker runs inside the **API** process ([`apps/api`](../api)), not this library package alone.
 
 - On Clef **thread split**, a `thread_closed` row is enqueued in `agent.memory_outbox` (same transaction as the new conversation).
 - **Graphiti ingest** runs only when a batch has at least **10** un-ingested conversations (`min_conversations_for_ingest`); smaller completed threads are marked `deferred` until a **30m** scheduler enqueues a `user_batch` for that user.

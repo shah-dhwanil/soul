@@ -1,11 +1,11 @@
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 
-from agent.api.routes import chat, health
 from agent.config import get_settings
 from agent.logging_config import configure_logging
 from agent.model.decision import DecisionModel
@@ -15,8 +15,11 @@ from agent.services.ingest import IngestService
 from agent.services.memory import MemoryService
 from agent.services.memory_worker import MemoryWorker
 from agent.services.turns import TurnService
+from api.routes import chat, health
 
-load_dotenv()
+_api_root = Path(__file__).resolve().parent
+load_dotenv(_api_root / ".env")
+load_dotenv(_api_root.parent / "agent" / ".env")
 configure_logging()
 logger = logging.getLogger(__name__)
 
@@ -53,6 +56,6 @@ async def lifespan(app: FastAPI):
         await engine.dispose()
 
 
-app = FastAPI(title="Soul Agent", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="Soul API", version="0.1.0", lifespan=lifespan)
 app.include_router(health.router)
 app.include_router(chat.router)
