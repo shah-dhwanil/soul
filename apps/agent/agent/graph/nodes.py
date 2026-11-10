@@ -1,5 +1,8 @@
+import logging
 from typing import Literal
 from uuid import UUID
+
+logger = logging.getLogger(__name__)
 
 from langchain_core.runnables import RunnableConfig
 
@@ -15,12 +18,20 @@ async def classify_parallel(state: TurnState, config: RunnableConfig) -> TurnSta
         state["user_message"],
         state.get("decision_history") or [],
     )
-    return TurnState(
+    out = TurnState(
         decisions=decisions,
         inject_previous_chat=decisions["inject_previous_chat"],
         split_thread=decisions["split_thread"],
         memory_required=decisions["memory_required"],
     )
+    logger.info(
+        "classify turn=%s inject=%s split=%s memory=%s",
+        state.get("turn_id"),
+        out["inject_previous_chat"],
+        out["split_thread"],
+        out["memory_required"],
+    )
+    return out
 
 
 async def apply_thread_policy(state: TurnState, config: RunnableConfig) -> TurnState:
@@ -55,7 +66,7 @@ async def apply_thread_policy(state: TurnState, config: RunnableConfig) -> TurnS
         pipeline = [ChatTurn.from_conversation(r) for r in rows]
         generation = pipeline
 
-    return TurnState(
+    out = TurnState(
         db_thread_id=updated_db_thread,
         previous_db_thread_id=previous_id,
         pipeline_history=pipeline,
@@ -63,23 +74,31 @@ async def apply_thread_policy(state: TurnState, config: RunnableConfig) -> TurnS
         ingest_pending_thread_id=ingest_pending,
         new_thread_created=new_thread,
     )
+    logger.info(
+        "thread_policy turn=%s new_thread=%s pipeline_turns=%d generation_turns=%d",
+        state.get("turn_id"),
+        new_thread,
+        len(pipeline),
+        len(generation),
+    )
+    return out
 
 
 async def plan_memory(state: TurnState, config: RunnableConfig) -> TurnState:
     if not state.get("memory_required"):
+        logger.info("plan_memory skipped (memory_required=false) turn=%s", state.get("turn_id"))
         return TurnState(memory_queries=[])
     deps = deps_from_config(config)
     queries = await deps.query_llm.get_queries(
         state["user_message"],
         state.get("pipeline_history") or [],
     )
-    if state["user_message"] and state["user_message"] not in queries:
-        queries.append(state["user_message"][:200])
+    logger.info("plan_memory turn=%s queries=%s", state.get("turn_id"), queries)
     return TurnState(memory_queries=queries)
 
 
 def route_memory(state: TurnState) -> Literal["retrieve_memory", "assemble_and_generate"]:
-    if state.get("memory_required"):
+    if state.get("memory_required") and (state.get("memory_queries") or []):
         return "retrieve_memory"
     return "assemble_and_generate"
 

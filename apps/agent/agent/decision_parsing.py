@@ -1,12 +1,16 @@
 """Parse Cloudflare Clef decision API payloads."""
 
+import logging
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 
 def _noul_yes_probability(answer: Any) -> float:
+    """P(yes) for Clef ``noul`` questions (0–1)."""
     if not isinstance(answer, dict):
         return 0.5
-    for key in ("probability_yes", "yes", "probability"):
+    for key in ("noul", "probability_yes", "yes", "probability"):
         if key in answer:
             try:
                 return float(answer[key])
@@ -16,7 +20,34 @@ def _noul_yes_probability(answer: Any) -> float:
         if str(answer["label"]).lower() in {"yes", "true"}:
             return float(answer["confidence"])
         return 1.0 - float(answer["confidence"])
+    logger.warning("Could not parse noul answer: %s", answer)
     return 0.5
+
+
+def clef_score_label(answer: Any) -> str | None:
+    """Best label from Clef ``score`` answers (flash legend + score or probabilities)."""
+    if not isinstance(answer, dict) or answer.get("type") != "score":
+        return None
+    legend = answer.get("legend") or {}
+    if not legend:
+        return answer.get("label") if isinstance(answer.get("label"), str) else None
+
+    probs = answer.get("probabilities")
+    if isinstance(probs, dict) and probs:
+        best_key = max(probs, key=lambda k: float(probs[k]))
+        label = legend.get(str(best_key)) or legend.get(best_key)
+        if label:
+            return str(label)
+
+    if "score" in answer:
+        try:
+            idx = int(round(float(answer["score"])))
+            label = legend.get(str(idx)) or legend.get(idx)
+            if label:
+                return str(label)
+        except (TypeError, ValueError):
+            pass
+    return None
 
 
 def parse_thread_and_memory(
@@ -27,8 +58,19 @@ def parse_thread_and_memory(
     thread_answer = answers.get("thread_continue", {})
     memory_answer = answers.get("memory_required", {})
 
-    needs_history = _noul_yes_probability(thread_answer) >= continue_threshold
+    p_thread = _noul_yes_probability(thread_answer)
+    p_memory = _noul_yes_probability(memory_answer)
+    needs_history = p_thread >= continue_threshold
     inject_previous_chat = needs_history
     split_thread = not needs_history
-    memory_required = _noul_yes_probability(memory_answer) >= continue_threshold
+    memory_required = p_memory >= continue_threshold
+
+    logger.info(
+        "Clef parse: p_thread=%.4f p_memory=%.4f inject=%s split=%s memory=%s",
+        p_thread,
+        p_memory,
+        inject_previous_chat,
+        split_thread,
+        memory_required,
+    )
     return inject_previous_chat, split_thread, memory_required

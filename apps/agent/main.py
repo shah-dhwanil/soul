@@ -7,13 +7,17 @@ from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 
 from agent.api.routes import chat, health
 from agent.config import get_settings
+from agent.logging_config import configure_logging
 from agent.model.decision import DecisionModel
 from agent.model.query import QueryLLM
 from agent.pg.session import create_engine, create_session_factory
+from agent.services.ingest import IngestService
 from agent.services.memory import MemoryService
+from agent.services.memory_worker import MemoryWorker
 from agent.services.turns import TurnService
 
 load_dotenv()
+configure_logging()
 logger = logging.getLogger(__name__)
 
 
@@ -35,8 +39,17 @@ async def lifespan(app: FastAPI):
             query_llm=QueryLLM(settings),
             memory_service=MemoryService(settings),
         )
+        ingest_service = IngestService(settings)
+        memory_worker = MemoryWorker(
+            settings=settings,
+            session_factory=session_factory,
+            ingest_service=ingest_service,
+        )
+        await memory_worker.start()
+        app.state.memory_worker = memory_worker
         app.state.engine = engine
         yield
+        await memory_worker.stop()
         await engine.dispose()
 
 

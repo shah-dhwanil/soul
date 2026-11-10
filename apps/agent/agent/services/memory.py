@@ -1,7 +1,10 @@
 import asyncio
+import logging
 from typing import Any
 
 from agent.config import Settings
+
+logger = logging.getLogger(__name__)
 from agent.graphiti.client import create_graphiti
 
 
@@ -45,11 +48,23 @@ class MemoryService:
                         seen.add(fact)
                         all_facts.append(item)
         except Exception:
+            logger.exception("Graphiti memory search failed for user=%s", user_id)
             degraded = True
         finally:
             if graphiti is not None:
                 await graphiti.close()
-        raw_fallback = queries[0] if queries else ""
-        if not all_facts and not degraded and raw_fallback:
-            all_facts.append({"fact": f"(search pending) {raw_fallback}", "query": raw_fallback})
+        if degraded:
+            logger.warning(
+                "Memory degraded user=%s queries=%s facts=%d",
+                user_id,
+                queries,
+                len(all_facts),
+            )
+        else:
+            logger.info(
+                "Memory search user=%s queries=%d facts=%d",
+                user_id,
+                len(queries),
+                len(all_facts),
+            )
         return all_facts, degraded

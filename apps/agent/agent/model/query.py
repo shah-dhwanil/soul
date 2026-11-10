@@ -1,5 +1,4 @@
-import json
-import re
+import logging
 from typing import Any
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
@@ -7,7 +6,14 @@ from langchain_groq import ChatGroq
 
 from agent.config import Settings
 from agent.history import ChatTurn
+from agent.model.memory_queries import (
+    MEMORY_QUERY_SYSTEM,
+    build_memory_query_user_prompt,
+    parse_memory_query_response,
+)
 from agent.persona import WrenPromptContext, render_wren_system_prompt
+
+logger = logging.getLogger(__name__)
 
 
 class QueryLLM:
@@ -31,29 +37,21 @@ class QueryLLM:
             f"user: {t.user_message}\nassistant: {t.agent_response}"
             for t in chat_history
         )
-        prompt = (
-            "Return a JSON array of 1 to 3 short search queries for a knowledge "
-            "graph. Use entities and events from context; do not invent names.\n"
-            f"Recent chat:\n{history_text}\n"
-            f"Current user message: {current_chat}"
-        )
+        user_prompt = build_memory_query_user_prompt(current_chat, history_text)
         response = await self._llm.ainvoke(
             [
-                SystemMessage(content='Reply with JSON only: ["query", ...]'),
-                HumanMessage(content=prompt),
+                SystemMessage(content=MEMORY_QUERY_SYSTEM),
+                HumanMessage(content=user_prompt),
             ]
         )
-        content = str(response.content).strip()
-        match = re.search(r"\[[\s\S]*\]", content)
-        if not match:
-            return [current_chat[:200]]
-        try:
-            parsed = json.loads(match.group())
-            if isinstance(parsed, list):
-                return [str(q) for q in parsed[:3] if q]
-        except json.JSONDecodeError:
-            pass
-        return [current_chat[:200]]
+        queries = parse_memory_query_response(str(response.content))
+        logger.info(
+            "memory_queries message=%r history_turns=%d queries=%s",
+            current_chat[:80],
+            len(chat_history),
+            queries,
+        )
+        return queries
 
     async def generate_response(
         self,
@@ -73,7 +71,9 @@ class QueryLLM:
             HumanMessage(
                 content=(
                     "Reply as Wren to the user's latest message below. "
-                    "Use 1–3 short bubbles separated by blank lines if needed.\n\n"
+                    "Use 1–3 short bubbles separated by blank lines if needed. "
+                    "Match their language and casualness; do not assume they want "
+                    "life coaching unless they asked.\n\n"
                     f"{current_chat}"
                 )
             )

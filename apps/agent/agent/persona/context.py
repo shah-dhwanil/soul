@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 from typing import Any
 
+from agent.decision_parsing import clef_score_label
 from agent.persona.defaults import (
     DEFAULT_ACTIVE_TRAITS,
     DEFAULT_BANNED_PHRASES,
@@ -37,10 +38,8 @@ def build_turn_directive(decisions: dict[str, Any] | None) -> str:
     answers = raw.get("answers") or {}
     user_emotion = answers.get("user_emotion", {})
     agent_emotion = answers.get("agent_emotion", {})
-    user_label = user_emotion.get("label") if isinstance(user_emotion, dict) else None
-    agent_label = (
-        agent_emotion.get("label") if isinstance(agent_emotion, dict) else None
-    )
+    user_label = clef_score_label(user_emotion)
+    agent_label = clef_score_label(agent_emotion)
     parts = [
         "Mode: chat",
         "Concern tier: none",

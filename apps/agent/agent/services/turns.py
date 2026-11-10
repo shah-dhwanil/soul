@@ -1,7 +1,10 @@
+import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4
+
+logger = logging.getLogger(__name__)
 
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -10,11 +13,12 @@ from agent.config import Settings
 from agent.graph.build import build_turn_graph
 from agent.graph.deps import GraphDeps
 from agent.graph.state import initial_state
-from agent.history import ChatTurn
+from agent.history import ChatTurn, PriorTurn
 from agent.model.decision import DecisionModel
 from agent.model.query import QueryLLM
 from agent.repositories.conversation import ConversationRepository
 from agent.services.memory import MemoryService
+from agent.services.memory_outbox import MemoryOutboxService
 from agent.services.threads import ThreadService
 
 
@@ -47,6 +51,26 @@ class TurnService:
         self._query_llm = query_llm
         self._memory_service = memory_service
 
+    async def seed_history(
+        self, user_id: str, prior: tuple[PriorTurn, ...]
+    ) -> None:
+        """Insert canned turns for evals without invoking the graph."""
+        if not prior:
+            return
+        async with self._session_factory() as session:
+            thread_service = ThreadService(session)
+            thread = await thread_service.get_or_create_active(user_id)
+            conv_repo = ConversationRepository(session)
+            for p in prior:
+                await conv_repo.create(
+                    thread_id=thread.id,
+                    user_message=p.user_message,
+                    agent_response=p.agent_response,
+                    final_state={"seeded_for_eval": True},
+                )
+            thread.last_message_at = datetime.now(UTC)
+            await session.commit()
+
     async def handle_turn(self, user_id: str, message: str) -> ChatResult:
         turn_id = uuid4()
         async with self._session_factory() as session:
@@ -78,7 +102,19 @@ class TurnService:
                     "deps": deps,
                 }
             }
+            logger.info(
+                "handle_turn start user=%s turn=%s message_len=%d",
+                user_id,
+                turn_id,
+                len(message),
+            )
             result = await self._graph.ainvoke(state, config)
+            logger.info(
+                "handle_turn done turn=%s memory_degraded=%s reply_len=%d",
+                turn_id,
+                result.get("memory_degraded"),
+                len(result.get("reply") or ""),
+            )
             db_thread_id = UUID(result["db_thread_id"])
             conv = await conv_repo.create(
                 thread_id=db_thread_id,
@@ -91,6 +127,14 @@ class TurnService:
             thread_row = await ThreadRepository(session).get(db_thread_id)
             if thread_row is not None:
                 thread_row.last_message_at = datetime.now(UTC)
+
+            ingest_pending = (result.get("final_state") or {}).get("ingest_pending")
+            if ingest_pending and self._settings.memory_ingest_enabled:
+                await MemoryOutboxService(session).enqueue_thread_closed(
+                    user_id,
+                    UUID(str(ingest_pending)),
+                )
+
             await session.commit()
 
             return ChatResult(

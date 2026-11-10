@@ -18,6 +18,14 @@ class ChatTurn:
         )
 
 
+@dataclass(frozen=True)
+class PriorTurn:
+    """Canned history row for eval seeding (same shape as ChatTurn)."""
+
+    user_message: str
+    agent_response: str
+
+
 def format_turns_for_clef(turns: list[ChatTurn], current_message: str) -> str:
     lines: list[str] = []
     for turn in turns:

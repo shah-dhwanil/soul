@@ -6,7 +6,15 @@ from agent.graph.state import TurnState
 
 
 def test_route_memory_when_required() -> None:
-    assert route_memory(TurnState(memory_required=True)) == "retrieve_memory"
+    assert (
+        route_memory(
+            TurnState(memory_required=True, memory_queries=["someone birthday"])
+        )
+        == "retrieve_memory"
+    )
+    assert route_memory(TurnState(memory_required=True, memory_queries=[])) == (
+        "assemble_and_generate"
+    )
     assert route_memory(TurnState(memory_required=False)) == "assemble_and_generate"
 
 
