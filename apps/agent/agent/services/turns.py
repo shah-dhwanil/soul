@@ -122,6 +122,7 @@ class TurnService:
                 agent_response=result.get("reply", ""),
                 final_state=result.get("final_state") or {},
             )
+            conv.finished_at = datetime.now(UTC)
             from agent.repositories.thread import ThreadRepository
 
             thread_row = await ThreadRepository(session).get(db_thread_id)

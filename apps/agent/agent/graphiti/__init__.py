@@ -27,6 +27,8 @@ from agent.graphiti.episode import (
     SHORT_USER_MESSAGE_WORDS,
     IngestTurn,
     build_episode_body,
+    enrich_episode_body_with_calendar,
+    resolve_next_monday,
 )
 
 __all__ = [
@@ -48,6 +50,8 @@ __all__ = [
     "IngestTurn",
     "SHORT_USER_MESSAGE_WORDS",
     "build_episode_body",
+    "enrich_episode_body_with_calendar",
+    "resolve_next_monday",
     "merge_aliases",
     "normalize_person_name",
 ]

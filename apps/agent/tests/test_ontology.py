@@ -161,6 +161,18 @@ def test_merge_aliases_is_a_no_op_on_person_nodes() -> None:
     assert merge_aliases(person, ["Mama", "mom", "Mom"]) is person
 
 
+def test_calendar_hint_resolves_next_monday_from_anchor() -> None:
+    from datetime import UTC, datetime
+
+    from agent.graphiti.episode import calendar_hint_line, resolve_next_monday
+
+    anchor = datetime(2026, 11, 10, 14, 51, 57, tzinfo=UTC)
+    assert resolve_next_monday(anchor).isoformat() == "2026-11-16"
+    hint = calendar_hint_line(anchor)
+    assert "2026-11-16" in hint
+    assert "REFERENCE_CALENDAR" in hint
+
+
 def test_extraction_instructions_guard_the_assistant_and_relative_dates() -> None:
     text = CUSTOM_EXTRACTION_INSTRUCTIONS.lower()
 

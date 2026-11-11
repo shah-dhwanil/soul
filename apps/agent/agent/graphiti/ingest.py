@@ -13,6 +13,7 @@ from agent.graphiti import (
     ENTITY_TYPES,
     IngestTurn,
     build_episode_body,
+    enrich_episode_body_with_calendar,
 )
 from agent.graphiti.client import create_graphiti
 from agent.pg.models import Conversation
@@ -56,6 +57,10 @@ async def add_episode_for_batch(
         raise ValueError("conversations must not be empty")
     turns = conversations_to_ingest_turns(conversations)
     body = build_episode_body(turns)
+    body = enrich_episode_body_with_calendar(
+        body,
+        user_messages=[(c.started_at, c.user_message) for c in conversations],
+    )
     ref_time = conversations[-1].finished_at
     if ref_time.tzinfo is None:
         ref_time = ref_time.replace(tzinfo=UTC)

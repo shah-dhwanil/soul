@@ -5,13 +5,19 @@ the body itself must carry absolute timestamps and must not present the AI
 assistant as a person.
 """
 
+import re
 from collections.abc import Iterable
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, date, datetime, timedelta
 
 _ASSISTANT_ROLES = {"assistant", "ai", "agent", "wren"}
 _USER_ROLE = "user"
 SHORT_USER_MESSAGE_WORDS = 8
+
+_RELATIVE_WEEKDAY = re.compile(
+    r"\b(next\s+)?(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b",
+    re.IGNORECASE,
+)
 
 @dataclass(frozen=True)
 class IngestTurn:
@@ -68,11 +74,57 @@ def build_episode_body(turns: Iterable[IngestTurn]) -> str:
     return "\n".join(lines)
 
 
+def resolve_next_monday(anchor: datetime) -> date:
+    """First Monday strictly after anchor's calendar day (UTC)."""
+    if anchor.tzinfo is None:
+        anchor = anchor.replace(tzinfo=UTC)
+    d = anchor.date()
+    days_ahead = (7 - d.weekday()) % 7
+    if days_ahead == 0:
+        days_ahead = 7
+    return d + timedelta(days=days_ahead)
+
+
+def calendar_hint_line(anchor: datetime) -> str:
+    if anchor.tzinfo is None:
+        anchor = anchor.replace(tzinfo=UTC)
+    d = anchor.date()
+    next_mon = resolve_next_monday(anchor)
+    return (
+        f"[{anchor.isoformat()}] REFERENCE_CALENDAR (UTC): anchor {d.isoformat()} "
+        f"is {d.strftime('%A')}. For this message, 'next Monday' means "
+        f"{next_mon.isoformat()}."
+    )
+
+
+def enrich_episode_body_with_calendar(
+    body: str,
+    *,
+    user_messages: Iterable[tuple[datetime, str]],
+) -> str:
+    """Prepend deterministic weekday resolution when user text uses relative days."""
+    if not _RELATIVE_WEEKDAY.search(body):
+        return body
+    hints: list[str] = []
+    seen: set[str] = set()
+    for started_at, text in user_messages:
+        if not _RELATIVE_WEEKDAY.search(text):
+            continue
+        key = started_at.isoformat()
+        if key in seen:
+            continue
+        seen.add(key)
+        hints.append(calendar_hint_line(started_at))
+    if not hints:
+        return body
+    return "\n".join(hints) + "\n" + body
+
+
 CUSTOM_EXTRACTION_INSTRUCTIONS = (
     "The graph owner is the User and the only speaker whose facts should be recorded. "
     "Wren is the AI assistant: never create a Person, User, or any other node for Wren "
     "or for any AI assistant. Assistant messages are context for understanding the "
-    "user, not facts about a person. Resolve every relative date using the absolute "
-    "timestamps in the episode text; if a date cannot be resolved, omit it instead of "
-    "guessing."
+    "user, not facts about a person. Resolve every relative date using REFERENCE_CALENDAR "
+    "lines and bracketed timestamps in the episode text; if a date cannot be resolved, "
+    "omit it instead of guessing."
 )
