@@ -75,9 +75,9 @@ Required env for workers: `GROQ_API_KEY`, `JINA_API_KEY`, `NEO4J_URI`, `NEO4J_US
 The memory worker runs inside the **API** process ([`apps/api`](../api)), not this library package alone.
 
 - On Clef **thread split**, a `thread_closed` row is enqueued in `agent.memory_outbox` (same transaction as the new conversation).
-- **Graphiti ingest** runs only when a batch has at least **10** un-ingested conversations (`min_conversations_for_ingest`); smaller completed threads are marked `deferred` until a **30m** scheduler enqueues a `user_batch` for that user.
+- **Graphiti ingest** for a single thread runs only when that thread has at least **10** un-ingested conversations (`min_conversations_for_ingest`); smaller completed threads are marked `deferred`. Every **30m**, `discover_user_batches` enqueues a `user_batch` when the user has **10+** un-ingested conversations across threads, **or** when they still have **deferred** rows and at least `min_conversations_for_idle_flush` (default **1**) un-ingested conversations—a **priority-1** flush ingests below the normal batch minimum. Successful `user_batch` ingest supersedes deferred `thread_closed` / `idle_checkpoint` rows for that user.
 - The API process polls the outbox every ~5s and nudges the worker after `POST /v1/chat` via `BackgroundTasks`.
 - Per-user serialization: only one `processing` job per `user_id` at a time.
 - Set `memory_ingest_enabled=false` to disable worker startup (tests / local chat-only).
 
-Settings (env or defaults): `min_conversations_for_ingest`, `idle_ingest_interval_minutes`, `outbox_poll_interval_s`, `outbox_max_attempts`, `max_conversations_per_episode`, `memory_ingest_enabled`, `graphiti_build_indices_on_startup`.
+Settings (env or defaults): `min_conversations_for_ingest`, `min_conversations_for_idle_flush`, `idle_ingest_interval_minutes`, `outbox_poll_interval_s`, `outbox_max_attempts`, `max_conversations_per_episode`, `memory_ingest_enabled`, `graphiti_build_indices_on_startup`.

@@ -1,7 +1,7 @@
 from datetime import UTC, datetime
 from uuid import UUID
 
-from sqlalchemy import and_, exists, select
+from sqlalchemy import and_, distinct, exists, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from agent.pg.models import (
@@ -118,3 +118,66 @@ class MemoryOutboxRepository:
         row.status = MemoryOutboxStatus.PENDING
         row.last_error = error[:2000]
         await self._session.flush()
+
+    async def list_user_ids_with_deferred_jobs(self) -> list[str]:
+        stmt = (
+            select(distinct(MemoryOutbox.user_id))
+            .where(MemoryOutbox.status == MemoryOutboxStatus.DEFERRED)
+            .order_by(MemoryOutbox.user_id)
+        )
+        result = await self._session.execute(stmt)
+        return list(result.scalars().all())
+
+    async def requeue_deferred_user_batch(
+        self, user_id: str, *, priority: int = 1
+    ) -> bool:
+        stmt = (
+            select(MemoryOutbox)
+            .where(
+                MemoryOutbox.user_id == user_id,
+                MemoryOutbox.job_type == MemoryOutboxJobType.USER_BATCH,
+                MemoryOutbox.status == MemoryOutboxStatus.DEFERRED,
+            )
+            .limit(1)
+            .with_for_update()
+        )
+        result = await self._session.execute(stmt)
+        row = result.scalar_one_or_none()
+        if row is None:
+            return False
+        row.status = MemoryOutboxStatus.PENDING
+        row.priority = priority
+        row.last_error = None
+        await self._session.flush()
+        return True
+
+    async def mark_deferred_superseded_for_user(
+        self,
+        user_id: str,
+        *,
+        conversation_to_id: UUID | None,
+    ) -> int:
+        now = datetime.now(UTC)
+        stmt = (
+            update(MemoryOutbox)
+            .where(
+                MemoryOutbox.user_id == user_id,
+                MemoryOutbox.status == MemoryOutboxStatus.DEFERRED,
+                MemoryOutbox.job_type.in_(
+                    [
+                        MemoryOutboxJobType.THREAD_CLOSED,
+                        MemoryOutboxJobType.IDLE_CHECKPOINT,
+                    ]
+                ),
+            )
+            .values(
+                status=MemoryOutboxStatus.PROCESSED,
+                episode_uuid="",
+                conversation_to_id=conversation_to_id,
+                processed_at=now,
+                last_error="superseded_by_user_batch",
+            )
+        )
+        result = await self._session.execute(stmt)
+        await self._session.flush()
+        return int(result.rowcount or 0)

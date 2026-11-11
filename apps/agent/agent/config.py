@@ -60,6 +60,7 @@ class Settings(BaseSettings):
     )
 
     min_conversations_for_ingest: int = Field(default=10)
+    min_conversations_for_idle_flush: int = Field(default=1)
     idle_ingest_interval_minutes: int = Field(default=30)
     outbox_poll_interval_s: float = Field(default=5.0)
     outbox_max_attempts: int = Field(default=5)

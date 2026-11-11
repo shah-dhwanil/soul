@@ -18,12 +18,16 @@ class MemoryOutboxService:
             idempotency_key=f"thread_closed:{thread_id}",
         )
 
-    async def enqueue_user_batch(self, user_id: str) -> None:
+    async def enqueue_user_batch(self, user_id: str, *, priority: int = 0) -> bool:
         if await self._repo.has_pending_user_batch(user_id):
-            return
-        await self._repo.enqueue(
+            return False
+        if await self._repo.requeue_deferred_user_batch(user_id, priority=priority):
+            return True
+        row = await self._repo.enqueue(
             user_id=user_id,
             job_type=MemoryOutboxJobType.USER_BATCH,
             thread_id=None,
             idempotency_key=f"user_batch:{user_id}",
+            priority=priority,
         )
+        return row is not None
