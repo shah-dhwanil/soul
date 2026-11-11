@@ -1,7 +1,12 @@
 from datetime import UTC, datetime
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
+import pytest
+
 from agent.graphiti.ingest import (
+    add_episode_for_batch,
     conversations_to_ingest_turns,
     episode_uuid_for_key,
 )
@@ -52,6 +57,36 @@ def test_episode_uuid_is_deterministic() -> None:
     c = episode_uuid_for_key("user_batch:bob")
     assert a == b
     assert a != c
+
+
+@pytest.mark.asyncio
+async def test_add_episode_for_batch_omits_uuid_kwarg() -> None:
+    created_uuid = str(uuid4())
+    mock_graphiti = MagicMock()
+    mock_graphiti.add_episode = AsyncMock(
+        return_value=SimpleNamespace(episode=SimpleNamespace(uuid=created_uuid))
+    )
+    mock_graphiti.close = AsyncMock()
+    now = datetime.now(UTC)
+    conv = Conversation(
+        id=uuid4(),
+        thread_id=uuid4(),
+        user_message="hi",
+        agent_response="hey",
+        final_state={},
+        started_at=now,
+        finished_at=now,
+    )
+    with patch(
+        "agent.graphiti.ingest.create_graphiti", AsyncMock(return_value=mock_graphiti)
+    ):
+        out = await add_episode_for_batch(
+            user_id="dh",
+            idempotency_key="user_batch:verify",
+            conversations=[conv],
+        )
+    assert out == created_uuid
+    assert "uuid" not in mock_graphiti.add_episode.await_args.kwargs
 
 
 def test_conversations_to_ingest_turns_alternates_roles() -> None:

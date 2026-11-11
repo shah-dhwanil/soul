@@ -1,5 +1,6 @@
 """Graphiti episode ingestion helpers."""
 
+import logging
 from datetime import UTC, datetime
 from uuid import NAMESPACE_URL, uuid5
 
@@ -15,6 +16,8 @@ from agent.graphiti import (
 )
 from agent.graphiti.client import create_graphiti
 from agent.pg.models import Conversation
+
+logger = logging.getLogger(__name__)
 
 
 def episode_uuid_for_key(idempotency_key: str) -> str:
@@ -56,21 +59,26 @@ async def add_episode_for_batch(
     ref_time = conversations[-1].finished_at
     if ref_time.tzinfo is None:
         ref_time = ref_time.replace(tzinfo=UTC)
-    episode_uuid = episode_uuid_for_key(idempotency_key)
     graphiti = await create_graphiti(build_indices=False)
     try:
-        await graphiti.add_episode(
+        # graphiti-core 0.31+ treats add_episode(uuid=...) as load-existing, not create.
+        results = await graphiti.add_episode(
             name=f"batch:{idempotency_key[:120]}",
             episode_body=body,
             source_description="Wren user conversation batch",
             reference_time=ref_time,
             source=EpisodeType.message,
             group_id=user_id,
-            uuid=episode_uuid,
             entity_types=ENTITY_TYPES,
             edge_types=EDGE_TYPES,
             edge_type_map=EDGE_TYPE_MAP,
             custom_extraction_instructions=CUSTOM_EXTRACTION_INSTRUCTIONS,
+        )
+        episode_uuid = results.episode.uuid
+        logger.info(
+            "graphiti ingest ok idempotency_key=%s episode_uuid=%s",
+            idempotency_key,
+            episode_uuid,
         )
     finally:
         await graphiti.close()
