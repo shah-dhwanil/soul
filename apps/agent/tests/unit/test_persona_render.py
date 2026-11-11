@@ -11,13 +11,15 @@ def test_render_replaces_all_placeholders() -> None:
         active_traits="a",
         banned_phrases="b",
         configured_resources="r",
-        turn_directive="dir",
-        memory_context="m",
+        turn_directive="Mode: chat. User seems: anxious.",
+        memory_context="secret-fact",
     )
     out = render_wren_system_prompt(ctx)
     assert "{{" not in out
     assert "You are Wren" in out
-    assert "m" in out
+    assert "secret-fact" not in out
+    assert "anxious" not in out
+    assert "Current turn" not in out
     assert out != WREN_SYSTEM_PROMPT
 
 

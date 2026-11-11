@@ -12,6 +12,7 @@ from agent.model.memory_queries import (
     parse_memory_query_response,
 )
 from agent.persona import WrenPromptContext, render_wren_system_prompt
+from agent.persona.context import build_generation_user_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -69,12 +70,10 @@ class QueryLLM:
             messages.append(AIMessage(content=turn.agent_response))
         messages.append(
             HumanMessage(
-                content=(
-                    "Reply as Wren to the user's latest message below. "
-                    "Use 1–3 short bubbles separated by blank lines if needed. "
-                    "Match their language and casualness; do not assume they want "
-                    "life coaching unless they asked.\n\n"
-                    f"{current_chat}"
+                content=build_generation_user_prompt(
+                    current_chat,
+                    turn_directive=persona.turn_directive,
+                    memory_context=persona.memory_context,
                 )
             )
         )

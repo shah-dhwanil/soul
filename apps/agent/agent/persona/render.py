@@ -12,8 +12,6 @@ def render_wren_system_prompt(ctx: WrenPromptContext) -> str:
         "active_traits": ctx.active_traits,
         "banned_phrases": ctx.banned_phrases,
         "configured_resources": ctx.configured_resources,
-        "turn_directive": ctx.turn_directive,
-        "memory_context": ctx.memory_context,
     }
     rendered = WREN_SYSTEM_PROMPT
     for name in PLACEHOLDER_NAMES:
