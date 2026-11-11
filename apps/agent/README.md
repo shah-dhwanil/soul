@@ -71,14 +71,20 @@ uv run pytest tests/test_ontology.py -q
 
 Required env for workers: `GROQ_API_KEY`, `JINA_API_KEY`, `NEO4J_URI`, `NEO4J_USERNAME`, `NEO4J_PASSWORD`.
 
-### Async memory outbox (in-process worker)
+### Async memory ingestion (in-process worker)
 
 The memory worker runs inside the **API** process ([`apps/api`](../api)), not this library package alone.
 
-- On Clef **thread split**, a `thread_closed` row is enqueued in `agent.memory_outbox` (same transaction as the new conversation).
-- **Graphiti ingest** for a single thread runs only when that thread has at least **10** un-ingested conversations (`min_conversations_for_ingest`); smaller completed threads are marked `deferred`. Every **30m**, `discover_user_batches` enqueues a `user_batch` when the user has **10+** un-ingested conversations across threads, **or** when they still have **deferred** rows and at least `min_conversations_for_idle_flush` (default **1**) un-ingested conversations—a **priority-1** flush ingests below the normal batch minimum. Successful `user_batch` ingest supersedes deferred `thread_closed` / `idle_checkpoint` rows for that user.
-- The API process polls the outbox every ~5s and nudges the worker after `POST /v1/chat` via `BackgroundTasks`.
-- Per-user serialization: only one `processing` job per `user_id` at a time.
-- Set `memory_ingest_enabled=false` to disable worker startup (tests / local chat-only).
+Three Postgres tables:
 
-Settings (env or defaults): `min_conversations_for_ingest`, `min_conversations_for_idle_flush`, `idle_ingest_interval_minutes`, `outbox_poll_interval_s`, `outbox_max_attempts`, `max_conversations_per_episode`, `memory_ingest_enabled`, `graphiti_build_indices_on_startup`.
+- **`memory_outbox`** — one durable row per conversation at turn commit (audit).
+- **`memory_ingestion_state`** — per-conversation `pending` / `ingested` / `failed` (source of truth for Graphiti backlog).
+- **`memory_ingest_job`** — batch jobs: `thread_closed`, `idle_checkpoint`, `user_batch` with worker status (`pending`, `deferred`, …).
+
+On every chat turn (when `memory_ingest_enabled`), the API enqueues `memory_outbox` + `memory_ingestion_state` for that conversation. On Clef **thread split**, a `thread_closed` job is also enqueued on `memory_ingest_job`.
+
+**SLA:** every conversation should reach Graphiti within **`idle_ingest_interval_minutes` (default 30)** of `conversation.finished_at`. `discover_ingest_jobs` runs every **`idle_discover_interval_minutes` (default 5)** and enqueues **`idle_checkpoint`** (priority 1, min batch 1) for any thread with pending state older than the idle threshold. **`user_batch`** (priority 0) runs when a user has **≥ `min_conversations_for_ingest` (10)** pending conversations.
+
+The API polls jobs every ~5s (`outbox_poll_interval_s`) and nudges the worker after `POST /v1/chat` via `BackgroundTasks`. Per-user serialization: only one `processing` job per `user_id` at a time. Set `memory_ingest_enabled=false` to disable worker startup (tests / local chat-only).
+
+Settings (env or defaults): `min_conversations_for_ingest`, `min_conversations_for_idle_flush`, `idle_ingest_interval_minutes`, `idle_discover_interval_minutes`, `outbox_poll_interval_s`, `outbox_max_attempts`, `max_conversations_per_episode`, `memory_ingest_enabled`, `graphiti_build_indices_on_startup`.

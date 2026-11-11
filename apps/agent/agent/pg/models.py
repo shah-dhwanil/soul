@@ -30,23 +30,30 @@ class BaseModel(Base):
         nullable=False,
     )
 
+
 class ThreadStatus(str, Enum):
     ACTIVE = "active"
     COMPLETED = "completed"
 
 
-class MemoryOutboxJobType(str, Enum):
+class MemoryIngestJobType(str, Enum):
     THREAD_CLOSED = "thread_closed"
     IDLE_CHECKPOINT = "idle_checkpoint"
     USER_BATCH = "user_batch"
 
 
-class MemoryOutboxStatus(str, Enum):
+class MemoryIngestJobStatus(str, Enum):
     PENDING = "pending"
     PROCESSING = "processing"
     PROCESSED = "processed"
     FAILED = "failed"
     DEFERRED = "deferred"
+
+
+class MemoryIngestionStateStatus(str, Enum):
+    PENDING = "pending"
+    INGESTED = "ingested"
+    FAILED = "failed"
 
 
 class Thread(BaseModel):
@@ -76,18 +83,16 @@ class Thread(BaseModel):
         nullable=False,
         default=ThreadStatus.ACTIVE,
     )
-    ingested_through_conversation_id: Mapped[UUID | None] = mapped_column(
-        nullable=True
-    )
 
     __table_args__ = (
         Index(
             "uniq_active_thread",
             "user_id",
-            unique=True,  # Makes it a unique index
+            unique=True,
             postgresql_where=text("status = 'active'"),
         ),
     )
+
 
 class Conversation(BaseModel):
     __tablename__ = "conversation"
@@ -113,14 +118,71 @@ class Conversation(BaseModel):
 
 
 class MemoryOutbox(BaseModel):
+    """One durable row per conversation at turn commit (audit / queue reference)."""
+
     __tablename__ = "memory_outbox"
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    conversation_id: Mapped[UUID] = mapped_column(nullable=False)
     user_id: Mapped[str] = mapped_column(nullable=False)
-    job_type: Mapped[MemoryOutboxJobType] = mapped_column(
+    thread_id: Mapped[UUID] = mapped_column(nullable=False)
+
+    __table_args__ = (
+        Index(
+            "uniq_memory_outbox_conversation",
+            "conversation_id",
+            unique=True,
+        ),
+        Index("ix_memory_outbox_user_created", "user_id", "created_at"),
+    )
+
+
+class MemoryIngestionState(BaseModel):
+    __tablename__ = "memory_ingestion_state"
+
+    conversation_id: Mapped[UUID] = mapped_column(primary_key=True)
+    user_id: Mapped[str] = mapped_column(nullable=False)
+    thread_id: Mapped[UUID] = mapped_column(nullable=False)
+    status: Mapped[MemoryIngestionStateStatus] = mapped_column(
         SAEnum(
-            MemoryOutboxJobType,
-            name="memoryoutboxjobtype",
+            MemoryIngestionStateStatus,
+            name="memoryingestionstatestatus",
+            schema="agent",
+            values_callable=lambda members: [m.value for m in members],
+            native_enum=True,
+        ),
+        nullable=False,
+        default=MemoryIngestionStateStatus.PENDING,
+    )
+    episode_uuid: Mapped[str | None] = mapped_column(String, nullable=True)
+    ingested_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    last_error: Mapped[str | None] = mapped_column(String, nullable=True)
+
+    __table_args__ = (
+        Index(
+            "ix_memory_ingestion_state_user_status",
+            "user_id",
+            "status",
+        ),
+        Index(
+            "ix_memory_ingestion_state_thread_status",
+            "thread_id",
+            "status",
+        ),
+    )
+
+
+class MemoryIngestJob(BaseModel):
+    __tablename__ = "memory_ingest_job"
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    user_id: Mapped[str] = mapped_column(nullable=False)
+    job_type: Mapped[MemoryIngestJobType] = mapped_column(
+        SAEnum(
+            MemoryIngestJobType,
+            name="memoryingestjobtype",
             schema="agent",
             values_callable=lambda members: [m.value for m in members],
             native_enum=True,
@@ -128,16 +190,16 @@ class MemoryOutbox(BaseModel):
         nullable=False,
     )
     thread_id: Mapped[UUID | None] = mapped_column(nullable=True)
-    status: Mapped[MemoryOutboxStatus] = mapped_column(
+    status: Mapped[MemoryIngestJobStatus] = mapped_column(
         SAEnum(
-            MemoryOutboxStatus,
-            name="memoryoutboxstatus",
+            MemoryIngestJobStatus,
+            name="memoryingestjobstatus",
             schema="agent",
             values_callable=lambda members: [m.value for m in members],
             native_enum=True,
         ),
         nullable=False,
-        default=MemoryOutboxStatus.PENDING,
+        default=MemoryIngestJobStatus.PENDING,
     )
     priority: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     idempotency_key: Mapped[str] = mapped_column(nullable=False)
@@ -152,11 +214,16 @@ class MemoryOutbox(BaseModel):
 
     __table_args__ = (
         Index(
-            "uniq_memory_outbox_idempotency_active",
+            "uniq_memory_ingest_job_idempotency_active",
             "idempotency_key",
             unique=True,
             postgresql_where=text("status IN ('pending', 'processing')"),
         ),
-        Index("ix_memory_outbox_status_priority", "status", "priority", "created_at"),
-        Index("ix_memory_outbox_user_status", "user_id", "status"),
+        Index(
+            "ix_memory_ingest_job_status_priority",
+            "status",
+            "priority",
+            "created_at",
+        ),
+        Index("ix_memory_ingest_job_user_status", "user_id", "status"),
     )

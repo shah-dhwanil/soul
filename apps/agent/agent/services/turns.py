@@ -128,12 +128,21 @@ class TurnService:
             if thread_row is not None:
                 thread_row.last_message_at = datetime.now(UTC)
 
-            ingest_pending = (result.get("final_state") or {}).get("ingest_pending")
-            if ingest_pending and self._settings.memory_ingest_enabled:
-                await MemoryOutboxService(session).enqueue_thread_closed(
-                    user_id,
-                    UUID(str(ingest_pending)),
+            if self._settings.memory_ingest_enabled:
+                outbox_svc = MemoryOutboxService(session)
+                await outbox_svc.enqueue_conversation_turn(
+                    conversation_id=conv.id,
+                    user_id=user_id,
+                    thread_id=db_thread_id,
                 )
+                ingest_pending = (result.get("final_state") or {}).get(
+                    "ingest_pending"
+                )
+                if ingest_pending:
+                    await outbox_svc.enqueue_thread_closed(
+                        user_id,
+                        UUID(str(ingest_pending)),
+                    )
 
             await session.commit()
 

@@ -38,14 +38,3 @@ class ThreadRepository:
             select(Thread).where(Thread.id == thread_id)
         )
         return result.scalar_one_or_none()
-
-    async def set_ingested_through(
-        self, thread_id: UUID, conversation_id: UUID
-    ) -> None:
-        result = await self._session.execute(
-            select(Thread).where(Thread.id == thread_id)
-        )
-        thread = result.scalar_one_or_none()
-        if thread is not None:
-            thread.ingested_through_conversation_id = conversation_id
-            await self._session.flush()

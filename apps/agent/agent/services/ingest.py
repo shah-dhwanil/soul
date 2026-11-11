@@ -1,12 +1,11 @@
 import logging
-from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from agent.config import Settings
 from agent.graphiti.ingest import add_episode_for_batch
-from agent.pg.models import Conversation, MemoryOutbox
-from agent.repositories.thread import ThreadRepository
+from agent.pg.models import Conversation, MemoryIngestJob
+from agent.repositories.memory_ingestion_state import MemoryIngestionStateRepository
 
 logger = logging.getLogger(__name__)
 
@@ -20,26 +19,25 @@ class IngestService:
         session: AsyncSession,
         *,
         user_id: str,
-        outbox: MemoryOutbox,
+        job: MemoryIngestJob,
         conversations: list[Conversation],
     ) -> str:
-        key = f"{outbox.job_type.value}:{outbox.id}"
+        key = f"{job.job_type.value}:{job.id}"
         episode_uuid = await add_episode_for_batch(
             user_id=user_id,
             idempotency_key=key,
             conversations=conversations,
         )
-        thread_repo = ThreadRepository(session)
-        last_by_thread: dict[UUID, UUID] = {}
-        for conv in conversations:
-            last_by_thread[conv.thread_id] = conv.id
-        for thread_id, conv_id in last_by_thread.items():
-            await thread_repo.set_ingested_through(thread_id, conv_id)
+        conv_ids = [c.id for c in conversations]
+        await MemoryIngestionStateRepository(session).mark_ingested(
+            conv_ids, episode_uuid=episode_uuid
+        )
+        threads = {c.thread_id for c in conversations}
         logger.info(
             "ingested user=%s episode=%s conversations=%d threads=%d",
             user_id,
             episode_uuid,
             len(conversations),
-            len(last_by_thread),
+            len(threads),
         )
         return episode_uuid
