@@ -101,20 +101,22 @@ async def apply_thread_policy(state: TurnState, config: RunnableConfig) -> TurnS
 
 
 async def plan_memory(state: TurnState, config: RunnableConfig) -> TurnState:
-    if not state.get("memory_required"):
-        logger.info("plan_memory skipped (memory_required=false) turn=%s", state.get("turn_id"))
-        return TurnState(memory_queries=[])
     deps = deps_from_config(config)
     queries = await deps.query_llm.get_queries(
         state["user_message"],
         state.get("pipeline_history") or [],
     )
-    logger.info("plan_memory turn=%s queries=%s", state.get("turn_id"), queries)
+    logger.info(
+        "plan_memory turn=%s clef_memory=%s queries=%s",
+        state.get("turn_id"),
+        state.get("memory_required"),
+        queries,
+    )
     return TurnState(memory_queries=queries)
 
 
 def route_memory(state: TurnState) -> Literal["retrieve_memory", "assemble_and_generate"]:
-    if state.get("memory_required") and (state.get("memory_queries") or []):
+    if state.get("memory_queries") or []:
         return "retrieve_memory"
     return "assemble_and_generate"
 

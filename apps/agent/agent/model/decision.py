@@ -49,8 +49,15 @@ class DecisionModel:
             "memory_required": {
                 "type": "noul",
                 "instructions": (
-                    "Does the current chat require facts from long-term memory "
-                    "about the user?"
+                    "Should a reply use facts looked up from long-term memory "
+                    "about this user? Answer yes when the latest message (with "
+                    "recent context) mentions retrievable personal context: "
+                    "jobs or interviews, exams, relationships, dates or places, "
+                    "goals, preferences, or ongoing situations—including "
+                    "updates (rescheduled, cancelled, moved, offer, etc.) even "
+                    "if the user is informing rather than asking. Answer no for "
+                    "greetings, filler, pure venting with no lookup target, or "
+                    "banter with no named entity, event, or plan."
                 ),
             }
         }
@@ -112,7 +119,7 @@ class DecisionModel:
             raw,
             inject_threshold=self._settings.thread_inject_threshold,
             split_threshold=self._settings.thread_split_threshold,
-            memory_threshold=self._settings.thread_inject_threshold,
+            memory_threshold=self._settings.memory_required_threshold,
         )
         return {
             "raw": raw,

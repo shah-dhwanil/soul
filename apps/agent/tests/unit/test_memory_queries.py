@@ -32,3 +32,9 @@ def test_route_memory_skips_empty_queries() -> None:
         route_memory(TurnState(memory_required=True, memory_queries=["exam"]))
         == "retrieve_memory"
     )
+    assert (
+        route_memory(
+            TurnState(memory_required=False, memory_queries=["job interview"])
+        )
+        == "retrieve_memory"
+    )

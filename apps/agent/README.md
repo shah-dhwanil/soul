@@ -38,6 +38,7 @@ Clef asks two separate noul questions: **same session** (`thread_continue`, cont
 | --- | --- | --- |
 | `THREAD_INJECT_THRESHOLD` | `0.5` | Inject recent turns when `recent_context_required` ≥ threshold |
 | `THREAD_SPLIT_THRESHOLD` | `0.2` | Rotate thread when `thread_continue` (same session) **below** threshold |
+| `MEMORY_REQUIRED_THRESHOLD` | `0.35` | Clef `memory_required` yes when score ≥ threshold (logged; retrieval also runs query planner every turn) |
 | `MIN_TURNS_BEFORE_SPLIT` | `2` | Ignore split signal until the thread has at least this many stored turns |
 
 Log lines `Clef parse: p_continue=... p_recent=...` help tune thresholds on real chats.

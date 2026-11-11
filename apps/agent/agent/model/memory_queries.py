@@ -14,6 +14,8 @@ Return [] when:
 
 Return 1–3 short queries only when chat references concrete things worth retrieving
 (names, relationships, plans, exams, jobs, pets, likes/dislikes, what happened).
+Schedule changes and life updates (e.g. interview or exam date moved) count—use
+short topical queries like job interview or interview schedule, not [].
 
 Rules:
 - Do not invent names or facts not in the message or recent chat.

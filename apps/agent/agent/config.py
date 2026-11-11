@@ -50,6 +50,7 @@ class Settings(BaseSettings):
     split_generation_history_limit: int = 50
     thread_inject_threshold: float = 0.5
     thread_split_threshold: float = 0.2
+    memory_required_threshold: float = Field(default=0.35)
     min_turns_before_split: int = 2
     memory_search_timeout_seconds: float = 8.0
     memory_num_results: int = 5

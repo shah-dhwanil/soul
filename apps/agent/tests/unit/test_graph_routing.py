@@ -16,6 +16,15 @@ def test_route_memory_when_required() -> None:
         "assemble_and_generate"
     )
     assert route_memory(TurnState(memory_required=False)) == "assemble_and_generate"
+    assert (
+        route_memory(
+            TurnState(
+                memory_required=False,
+                memory_queries=["interview Friday"],
+            )
+        )
+        == "retrieve_memory"
+    )
 
 
 def test_graph_compiles_with_memory_saver() -> None:
