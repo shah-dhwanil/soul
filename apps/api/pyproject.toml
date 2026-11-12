@@ -13,8 +13,14 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "agent",
+    "alembic>=1.20.1",
+    "argon2-cffi>=23.1.0",
+    "email-validator>=2.2.0",
     "fastapi>=0.115.0",
+    "pydantic-settings>=2.16.2",
+    "pyjwt>=2.10.0",
     "python-dotenv>=1.0.0",
+    "sqlalchemy[asyncio]>=2.1.8",
     "uvicorn[standard]>=0.32.0",
 ]
 
@@ -30,3 +36,6 @@ agent = { workspace = true }
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
+markers = [
+    "integration: requires a live database",
+]

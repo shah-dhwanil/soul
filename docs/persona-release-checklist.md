@@ -11,4 +11,4 @@ Verify before each release.
 - [ ] Spec §11.5 ease-back (stage drops after a three-week absence) is not implemented; stage only rises. Known gap.
 - [ ] Proactive check-ins (§15) are not implemented.
 - [ ] Crisis resources are locale-keyed; the default locale's text is reviewed and every other locale falls back to the generic line.
-- [ ] `X-USER-ID` has no authentication. **Launch blocker.**
+- [ ] `X-USER-ID` has no authentication. **Launch blocker.** — Landed: every `/v1` route now takes its identity from a Bearer access token ([ADR 0005](adr/0005-email-password-jwt-auth.md)). Remaining auth gaps: refresh tokens are not revocable, there is no email verification or password recovery, and the auth throttle is per API process.

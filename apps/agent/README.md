@@ -34,9 +34,9 @@ Code lives in [`agent/persona/`](agent/persona/):
 
 Per-user state lives in four Postgres tables (models in [`agent/pg/models.py`](agent/pg/models.py)): `user_persona` (temperament, dials, stage, dependency level), `user_trait`, `user_signal`, and `user_leaning`. A `detection_job` table queues background detection work. Run `uv run alembic upgrade head` to create them.
 
-### `X-USER-ID`
+### Identity
 
-Every `/v1` API route reads the user from the `X-USER-ID` header. There is **no authentication** (see [ADR 0004](../../docs/adr/0004-x-user-id-without-auth.md)); do not expose the API beyond a trusted network.
+Every `/v1` API route takes the user from a validated Bearer access token. The `X-USER-ID` header is gone; identity is email + password auth owned by the API app (see [ADR 0005](../../docs/adr/0005-email-password-jwt-auth.md), which supersedes [ADR 0004](../../docs/adr/0004-x-user-id-without-auth.md)). The agent still only ever sees a `user_id` string — no email, password, or token reaches it.
 
 ### Persona asset hash
 

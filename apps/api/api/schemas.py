@@ -1,7 +1,7 @@
 from typing import Any, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 
 class ChatRequest(BaseModel):
@@ -133,3 +133,72 @@ class MemoryResponse(BaseModel):
 class ConversationCreated(BaseModel):
     conversation_id: UUID
     first_message: str
+
+
+class RegisterRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    email: EmailStr
+    password: str = Field(min_length=8, max_length=1024)
+
+    @field_validator("email", mode="before")
+    @classmethod
+    def _normalize_email(cls, value: Any) -> Any:
+        """Emails are stored lowercase and trimmed."""
+        if isinstance(value, str):
+            return value.strip().lower()
+        return value
+
+
+class LoginRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    email: EmailStr
+    password: str = Field(min_length=1, max_length=1024)
+
+    @field_validator("email", mode="before")
+    @classmethod
+    def _normalize_email(cls, value: Any) -> Any:
+        if isinstance(value, str):
+            return value.strip().lower()
+        return value
+
+
+class RefreshRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    refresh_token: str = Field(min_length=1)
+
+
+class AuthUserResponse(BaseModel):
+    """A signed-in account plus its token pair."""
+
+    user_id: str
+    email: str
+    onboarded: bool
+    onboarding_step: int
+    access_token: str
+    refresh_token: str
+
+
+class AccountResponse(BaseModel):
+    """An account without its credentials or tokens."""
+
+    user_id: str
+    email: str
+    onboarded: bool
+    onboarding_step: int
+
+
+class AccessTokenResponse(BaseModel):
+    access_token: str
+
+
+class TemperamentPatch(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    temperament: str = Field(min_length=1)
+
+
+class TemperamentPatchResponse(BaseModel):
+    temperament: str

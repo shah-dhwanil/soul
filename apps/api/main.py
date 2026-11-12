@@ -17,7 +17,9 @@ from agent.services.memory import MemoryService
 from agent.services.memory_worker import MemoryWorker
 from agent.services.recompute import RecomputeWorker
 from agent.services.turns import TurnService
-from api.routes import chat, health, users
+from api.config import get_auth_settings
+from api.errors import install_error_handler
+from api.routes import auth, chat, health, users
 
 _api_root = Path(__file__).resolve().parent
 load_dotenv(_api_root / ".env")
@@ -29,6 +31,9 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     settings = get_settings()
+    # Fail fast: without JWT_SECRET the API cannot validate an access token,
+    # and serving identity it cannot verify is worse than not serving at all.
+    get_auth_settings()
     engine = create_engine(settings)
     session_factory = create_session_factory(engine)
 
@@ -74,6 +79,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Soul API", version="0.1.0", lifespan=lifespan)
+install_error_handler(app)
 app.include_router(health.router)
+app.include_router(auth.router)
 app.include_router(chat.router)
 app.include_router(users.router)

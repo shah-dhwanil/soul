@@ -1,12 +1,14 @@
 """Persona state and detection job repositories. Never log message content."""
 
 from datetime import UTC, datetime
+from dataclasses import asdict
 from uuid import UUID
 
 from sqlalchemy import and_, delete, exists, select, text, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from agent.persona.constants.temperaments import TEMPERAMENTS
 from agent.pg.models import (
     DetectionJob,
     UserLeaning,
@@ -206,6 +208,29 @@ class PersonaRepository:
         persona = await self.get_or_create(user_id)
         persona.settings = settings
         await self._session.flush()
+
+    async def reseed(self, user_id: str, temperament: str) -> dict:
+        """Re-seed the persona with a temperament and its default dials.
+
+        The explicit dial overrides are dropped, so the dials are the new
+        temperament's defaults. Learned dials are left alone, because they
+        were learned rather than chosen.
+        """
+        persona = await self.get_or_create(user_id)
+        seed = asdict(TEMPERAMENTS[temperament].default_dials)
+        settings = dict(persona.settings or {})
+        settings.pop("dials", None)
+        persona.temperament = temperament
+        persona.dials = dict(seed)
+        persona.settings = settings
+        await self._session.flush()
+        return {
+            "user_id": persona.user_id,
+            "temperament": persona.temperament,
+            "dials": persona.dials,
+            "learned_dials": persona.learned_dials,
+            "settings": persona.settings,
+        }
 
     async def reset_learned(self, user_id: str) -> None:
         persona = await self.get_or_create(user_id)
