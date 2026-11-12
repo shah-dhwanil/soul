@@ -65,7 +65,7 @@ export function StepAccount({
         </p>
       </div>
 
-      <form className="flex flex-col gap-5" onSubmit={submit}>
+      <form className="flex flex-col gap-5" method="post" onSubmit={submit}>
         <div className="flex flex-col gap-2">
           <Label htmlFor="onboarding-email">Email</Label>
           <Input

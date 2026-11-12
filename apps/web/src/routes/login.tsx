@@ -122,7 +122,11 @@ function LoginPage() {
           Sign in to pick up where you left off.
         </p>
 
-        <form className="mt-8 flex flex-col gap-5" onSubmit={onSubmit}>
+        <form
+          className="mt-8 flex flex-col gap-5"
+          method="post"
+          onSubmit={onSubmit}
+        >
           <div className="flex flex-col gap-2">
             <Label htmlFor="email">Email</Label>
             <Input
