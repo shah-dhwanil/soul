@@ -1,6 +1,6 @@
 from agent.persona.context import WrenPromptContext, prompt_context_from_turn
+from agent.persona.loader import load_persona
 from agent.persona.render import render_wren_system_prompt
-from agent.persona.template import WREN_SYSTEM_PROMPT
 
 
 def test_render_replaces_all_placeholders() -> None:
@@ -20,7 +20,7 @@ def test_render_replaces_all_placeholders() -> None:
     assert "secret-fact" not in out
     assert "anxious" not in out
     assert "Current turn" not in out
-    assert out != WREN_SYSTEM_PROMPT
+    assert out != load_persona().prompt
 
 
 def test_prompt_context_from_turn_uses_memory_facts() -> None:
