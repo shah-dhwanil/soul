@@ -18,6 +18,13 @@ dependencies = [
     "uvicorn[standard]>=0.32.0",
 ]
 
+[dependency-groups]
+dev = [
+    "pytest>=9.2.0",
+    "pytest-asyncio>=0.24.0",
+    "httpx>=0.28.0",
+]
+
 [tool.uv.sources]
 agent = { workspace = true }
 

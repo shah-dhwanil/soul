@@ -17,6 +17,7 @@ from agent.history import ChatTurn, PriorTurn
 from agent.model.decision import DecisionModel
 from agent.model.query import QueryLLM
 from agent.repositories.conversation import ConversationRepository
+from agent.repositories.persona import DetectionJobRepository, PersonaRepository
 from agent.services.memory import MemoryService
 from agent.services.memory_outbox import MemoryOutboxService
 from agent.services.threads import ThreadService
@@ -31,6 +32,8 @@ class ChatResult:
     decisions: dict[str, Any]
     memory_degraded: bool
     conversation_id: UUID | None
+    mode: str | None = None
+    concern_tier: str | None = None
 
 
 class TurnService:
@@ -76,6 +79,11 @@ class TurnService:
         async with self._session_factory() as session:
             thread_service = ThreadService(session)
             thread = await thread_service.get_or_create_active(user_id)
+            await PersonaRepository(session).get_or_create(
+                user_id,
+                locale=self._settings.default_locale,
+                timezone=self._settings.default_timezone,
+            )
             conv_repo = ConversationRepository(session)
             recent = await conv_repo.list_recent_for_thread(
                 thread.id, self._settings.decision_history_limit
@@ -123,6 +131,18 @@ class TurnService:
                 final_state=result.get("final_state") or {},
             )
             conv.finished_at = datetime.now(UTC)
+            persisted = (result.get("final_state") or {}).get("persona") or {}
+            conv.mode = persisted.get("mode")
+            conv.concern_tier = persisted.get("concern_tier")
+            conv.dependency_level = persisted.get("dependency_level")
+            conv.stage = persisted.get("stage")
+            conv.asked_question = bool(persisted.get("asked_question"))
+            conv.trait_used = persisted.get("trait_used")
+            conv.validation = persisted.get("validation") or {}
+            conv.persona_version = persisted.get("persona_version")
+            await DetectionJobRepository(session).enqueue(
+                user_id=user_id, conversation_id=conv.id
+            )
             from agent.repositories.thread import ThreadRepository
 
             thread_row = await ThreadRepository(session).get(db_thread_id)
@@ -155,4 +175,6 @@ class TurnService:
                 decisions=result.get("decisions") or {},
                 memory_degraded=bool(result.get("memory_degraded")),
                 conversation_id=conv.id,
+                mode=conv.mode,
+                concern_tier=conv.concern_tier,
             )

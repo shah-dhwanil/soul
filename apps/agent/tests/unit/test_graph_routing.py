@@ -30,3 +30,19 @@ def test_route_memory_when_required() -> None:
 def test_graph_compiles_with_memory_saver() -> None:
     graph = build_turn_graph(checkpointer=MemorySaver())
     assert graph is not None
+
+
+def test_route_after_directive() -> None:
+    from agent.graph.nodes import route_after_directive
+
+    assert route_after_directive(TurnState(concern_tier="acute")) == "respond_safety"
+    assert route_after_directive(TurnState(concern_tier="concern")) == "respond_concern"
+    assert (
+        route_after_directive(
+            TurnState(concern_tier="concern", concern_asked_this_episode=True)
+        )
+        == "assemble_and_generate"
+    )
+    assert route_after_directive(TurnState(concern_tier="normal")) == (
+        "assemble_and_generate"
+    )

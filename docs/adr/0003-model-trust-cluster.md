@@ -1,0 +1,3 @@
+# Model-trust cluster
+
+Four rules are enforced by the model reading the prompt rather than by deterministic code: banned-phrase and affect-rule checks are logged but never acted on, sensitive memory is not gated at retrieval, the professional-advice boundary has no detector or eval probe, and the concern tier fails open. Each gate would cost a round trip or a schema migration and the MVP needs the character's voice more than the guarantees, so a single reply can violate all four and pass every automated check; the offline eval suite is the only backstop, as a pre-release gate rather than a CI gate. Revisit when the eval suite can run on every change.

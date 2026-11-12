@@ -68,3 +68,19 @@ class MemoryService:
                 len(all_facts),
             )
         return all_facts, degraded
+
+
+    async def list_facts(self, user_id: str, limit: int = 100) -> list[str]:
+        """Best-effort listing of stored facts for a user (empty on failure)."""
+        facts, _ = await self.search(user_id, ["everything known about this person"])
+        return [f["fact"] for f in facts][:limit]
+
+    async def forget(self, user_id: str) -> None:
+        """Remove every graph node/edge scoped to this user's group id."""
+        graphiti = await create_graphiti(build_indices=False)
+        try:
+            await graphiti.driver.execute_query(
+                "MATCH (n {group_id: $group_id}) DETACH DELETE n", group_id=user_id
+            )
+        finally:
+            await graphiti.close()

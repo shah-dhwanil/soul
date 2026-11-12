@@ -3,7 +3,16 @@ from enum import Enum
 from typing import Any
 from uuid import UUID, uuid4
 
-from sqlalchemy import DateTime, Enum as SAEnum, Integer, MetaData, String, text
+from sqlalchemy import (
+    Boolean,
+    DateTime,
+    Enum as SAEnum,
+    Float,
+    Integer,
+    MetaData,
+    String,
+    text,
+)
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.schema import Index
 from sqlalchemy.sql import func
@@ -54,6 +63,42 @@ class MemoryIngestionStateStatus(str, Enum):
     PENDING = "pending"
     INGESTED = "ingested"
     FAILED = "failed"
+
+
+class TrustSignal(str, Enum):
+    S1 = "s1"
+    S2 = "s2"
+    S3 = "s3"
+    S4 = "s4"
+    S5 = "s5"
+    S6 = "s6"
+
+
+class DependencySignal(str, Enum):
+    D1 = "d1"
+    D2 = "d2"
+    D3 = "d3"
+    D4 = "d4"
+    D5 = "d5"
+    D6 = "d6"
+
+
+class TraitStatus(str, Enum):
+    NOTICED = "noticed"
+    CANDIDATE = "candidate"
+    TRIAL = "trial"
+    ACTIVE = "active"
+    DORMANT = "dormant"
+    RETIRED = "retired"
+
+
+class LeaningStatus(str, Enum):
+    NOTICED = "noticed"
+    CANDIDATE = "candidate"
+    TILT = "tilt"
+    ACTIVE = "active"
+    DORMANT = "dormant"
+    RETIRED = "retired"
 
 
 class Thread(BaseModel):
@@ -115,6 +160,18 @@ class Conversation(BaseModel):
         onupdate=func.now(),
         nullable=False,
     )
+    mode: Mapped[str | None] = mapped_column(String, nullable=True)
+    concern_tier: Mapped[str | None] = mapped_column(String, nullable=True)
+    dependency_level: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    stage: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    asked_question: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=text("false")
+    )
+    trait_used: Mapped[str | None] = mapped_column(String, nullable=True)
+    validation: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb")
+    )
+    persona_version: Mapped[str | None] = mapped_column(String, nullable=True)
 
 
 class MemoryOutbox(BaseModel):
@@ -226,4 +283,157 @@ class MemoryIngestJob(BaseModel):
             "created_at",
         ),
         Index("ix_memory_ingest_job_user_status", "user_id", "status"),
+    )
+
+
+# Persona state tables. Never log message content from any of these tables.
+
+
+class UserPersona(BaseModel):
+    __tablename__ = "user_persona"
+
+    user_id: Mapped[str] = mapped_column(String, primary_key=True)
+    temperament: Mapped[str] = mapped_column(String, nullable=False)
+    locale: Mapped[str] = mapped_column(String, nullable=False)
+    timezone: Mapped[str] = mapped_column(String, nullable=False)
+    dials: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, default=dict
+    )
+    learned_dials: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, default=dict
+    )
+    stage: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    dependency_level: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0
+    )
+    dependency_level_since: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    dependency_last_level2_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    dependency_low_baseline: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False
+    )
+    dependency_explained_until: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    settings: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, default=dict
+    )
+    counters: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, default=dict
+    )
+    stage_frozen_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    last_attunement_review_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+
+class UserTrait(BaseModel):
+    __tablename__ = "user_trait"
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    user_id: Mapped[str] = mapped_column(String, nullable=False)
+    kind: Mapped[str] = mapped_column(String, nullable=False)
+    label: Mapped[str] = mapped_column(String, nullable=False)
+    status: Mapped[str] = mapped_column(
+        String, nullable=False, default=TraitStatus.NOTICED.value
+    )
+    positive_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    negative_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    neutral_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    distinct_days: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    sensitive: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    last_used_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    last_landed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+    __table_args__ = (Index("ix_user_trait_user_status", "user_id", "status"),)
+
+
+class UserSignal(BaseModel):
+    __tablename__ = "user_signal"
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    user_id: Mapped[str] = mapped_column(String, nullable=False)
+    kind: Mapped[str] = mapped_column(String, nullable=False)
+    signal: Mapped[str] = mapped_column(String, nullable=False)
+    occurred_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    counts_toward_stage: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True
+    )
+    # "metadata" is reserved on declarative classes; the DB column keeps the name.
+    metadata_: Mapped[dict[str, Any]] = mapped_column(
+        "metadata", JSONB, nullable=False, default=dict
+    )
+
+    __table_args__ = (
+        Index("ix_user_signal_user_kind", "user_id", "kind"),
+        Index("ix_user_signal_user_occurred", "user_id", "occurred_at"),
+        Index(
+            "ix_user_signal_user_expires",
+            "user_id",
+            "expires_at",
+            postgresql_where=text("expires_at IS NOT NULL"),
+        ),
+    )
+
+
+class UserLeaning(BaseModel):
+    __tablename__ = "user_leaning"
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    user_id: Mapped[str] = mapped_column(String, nullable=False)
+    kind: Mapped[str] = mapped_column(String, nullable=False)
+    value: Mapped[str] = mapped_column(String, nullable=False)
+    status: Mapped[str] = mapped_column(
+        String, nullable=False, default=LeaningStatus.NOTICED.value
+    )
+    positive_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    negative_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    distinct_days: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    baseline_engagement: Mapped[float] = mapped_column(
+        Float, nullable=False, default=0.0
+    )
+    tilt_started_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+    __table_args__ = (Index("ix_user_leaning_user_status", "user_id", "status"),)
+
+
+class DetectionJob(BaseModel):
+    """Queue row for the detection worker. Holds ids only, never message content."""
+
+    __tablename__ = "detection_job"
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    user_id: Mapped[str] = mapped_column(String, nullable=False)
+    conversation_id: Mapped[UUID] = mapped_column(nullable=False)
+    status: Mapped[str] = mapped_column(String, nullable=False, default="pending")
+    attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    last_error: Mapped[str | None] = mapped_column(String, nullable=True)
+    processed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+    __table_args__ = (
+        Index("ix_detection_job_status_created", "status", "created_at"),
+        Index(
+            "uniq_detection_job_conversation_active",
+            "conversation_id",
+            unique=True,
+            postgresql_where=text("status IN ('pending','processing')"),
+        ),
     )

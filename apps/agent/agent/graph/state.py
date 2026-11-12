@@ -2,6 +2,8 @@ from typing import Any, TypedDict
 from uuid import UUID
 
 from agent.history import ChatTurn
+from agent.persona.directive import TurnDirective
+from agent.services.persona_state import PersonaState
 
 
 class TurnState(TypedDict, total=False):
@@ -25,6 +27,17 @@ class TurnState(TypedDict, total=False):
     final_state: dict[str, Any]
     ingest_pending_thread_id: str | None
     new_thread_created: bool
+    concern_tier: str
+    register: str
+    situation: str
+    mode: str
+    directive: TurnDirective | None
+    persona_state: PersonaState | None
+    validation: dict[str, Any]
+    reply_source: str  # "model", "safety", "concern", "boundary"
+    reply_is_safety: bool
+    concern_asked_this_episode: bool
+
 
 
 def initial_state(
@@ -56,4 +69,14 @@ def initial_state(
         final_state={},
         ingest_pending_thread_id=None,
         new_thread_created=False,
+        concern_tier="normal",
+        register="",
+        situation="",
+        mode="",
+        directive=None,
+        persona_state=None,
+        validation={},
+        reply_source="",
+        reply_is_safety=False,
+        concern_asked_this_episode=False,
     )

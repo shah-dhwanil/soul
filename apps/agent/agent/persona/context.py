@@ -2,26 +2,29 @@ from dataclasses import dataclass
 from typing import Any
 
 from agent.decision_parsing import clef_score_label
-from agent.persona.defaults import (
-    DEFAULT_ACTIVE_TRAITS,
-    DEFAULT_BANNED_PHRASES,
-    DEFAULT_CRISIS_RESOURCES,
-    DEFAULT_DIALS,
-    DEFAULT_STAGE_PERMISSIONS,
-    DEFAULT_TEMPERAMENT,
+from agent.persona.constants.banned import BANNED_PHRASES
+from agent.persona.constants.crisis import resolve_crisis_resources
+from agent.persona.constants.modes import mode_instruction
+from agent.persona.directive import TurnDirective, render_directive
+from agent.persona.layers import (
+    render_active_traits,
+    render_dials,
+    render_stage_permissions,
+    render_temperament,
 )
 
 
 @dataclass(frozen=True)
 class WrenPromptContext:
-    temperament: str = DEFAULT_TEMPERAMENT
-    dials: str = DEFAULT_DIALS
-    stage_permissions: str = DEFAULT_STAGE_PERMISSIONS
-    active_traits: str = DEFAULT_ACTIVE_TRAITS
-    banned_phrases: str = DEFAULT_BANNED_PHRASES
-    configured_resources: str = DEFAULT_CRISIS_RESOURCES
-    turn_directive: str = "Mode: chat. Concern tier: none. Dependency: baseline."
-    memory_context: str = "(none)"
+    temperament: str
+    dials: str
+    stage_permissions: str
+    active_traits: str
+    mode_block: str
+    turn_directive: str
+    banned_phrases: str
+    configured_resources: str
+    memory_context: str
 
 
 def format_memory_context(memories: list[dict[str, Any]]) -> str:
@@ -65,12 +68,10 @@ def build_generation_user_prompt(
         "Match their language and casualness; do not assume they want "
         "life coaching unless they asked."
     )
-    parts = [
-        header,
-        "",
-        "Current turn (this reply only):",
-        turn_directive.strip(),
-    ]
+    # turn_directive is accepted for API compatibility; it now lives in the
+    # system prompt, so it is intentionally not embedded here.
+    del turn_directive
+    parts = [header]
     if memory_context and memory_context != "(none)":
         parts.extend(
             [
@@ -88,9 +89,17 @@ def prompt_context_from_turn(
     decisions: dict[str, Any] | None,
     memories: list[dict[str, Any]],
     configured_resources: str | None = None,
+    directive: TurnDirective,
+    persona_state: dict[str, Any],
 ) -> WrenPromptContext:
     return WrenPromptContext(
-        turn_directive=build_turn_directive(decisions),
+        temperament=render_temperament(persona_state["temperament"]),
+        dials=render_dials(persona_state["dials"]),
+        stage_permissions=render_stage_permissions(persona_state["stage"]),
+        active_traits=render_active_traits(persona_state["traits"]),
+        mode_block=mode_instruction(directive.mode),
+        turn_directive=render_directive(directive),
+        banned_phrases=", ".join(BANNED_PHRASES),
+        configured_resources=configured_resources or resolve_crisis_resources(None),
         memory_context=format_memory_context(memories),
-        configured_resources=configured_resources or DEFAULT_CRISIS_RESOURCES,
     )

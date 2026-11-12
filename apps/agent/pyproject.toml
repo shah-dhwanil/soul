@@ -41,5 +41,6 @@ testpaths = ["tests"]
 asyncio_mode = "auto"
 markers = [
     "eval: end-to-end agent eval with live LLM APIs",
+    "integration: requires cloud credentials and database",
     "live: requires cloud credentials and database",
 ]
