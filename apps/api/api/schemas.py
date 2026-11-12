@@ -192,3 +192,13 @@ class AccountResponse(BaseModel):
 
 class AccessTokenResponse(BaseModel):
     access_token: str
+
+
+class TemperamentPatch(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    temperament: str = Field(min_length=1)
+
+
+class TemperamentPatchResponse(BaseModel):
+    temperament: str

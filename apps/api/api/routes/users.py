@@ -16,6 +16,7 @@ from agent.services.onboarding import create_first_conversation
 from agent.services.persona_state import _resolve_dials
 from agent.services.threads import ThreadService
 from api.deps import (
+    AccountRepoDep,
     CurrentUserId,
     MatchingUserId,
     MemoryServiceDep,
@@ -32,6 +33,8 @@ from api.schemas import (
     SettingsPatch,
     SettingsResponse,
     TemperamentOut,
+    TemperamentPatch,
+    TemperamentPatchResponse,
     TemperamentsResponse,
     TraitOut,
     TraitRename,
@@ -42,6 +45,22 @@ from api.schemas import (
 router = APIRouter(tags=["users"])
 
 _NOT_FOUND = {"code": "user_not_found"}
+
+_DIAL_KEYS = ("warmth", "directness", "humor", "initiative")
+
+
+def _settings_step(patch: dict[str, Any]) -> int:
+    """The onboarding step a settings patch reaches.
+
+    Naming the user is step 2, tuning the dials is step 3. A patch that
+    clears a value (null) does not advance anything.
+    """
+    step = 0
+    if patch.get("address") is not None:
+        step = 2
+    if any(patch.get(key) is not None for key in _DIAL_KEYS):
+        step = 3
+    return step
 
 
 def _field(row: Any, name: str, default: Any = None) -> Any:
@@ -115,13 +134,18 @@ async def list_temperaments() -> TemperamentsResponse:
 
 @router.post("/v1/users", response_model=CreateUserResponse)
 async def create_user(
-    body: CreateUserRequest, user_id: CurrentUserId, repo: PersonaRepoDep
+    body: CreateUserRequest,
+    user_id: CurrentUserId,
+    repo: PersonaRepoDep,
+    accounts: AccountRepoDep,
 ) -> CreateUserResponse:
     temperament = body.temperament if body.temperament in TEMPERAMENTS else "steady"
     # Idempotent: get_or_create returns the existing row for a known user.
     persona = await repo.get_or_create(
         user_id, temperament=temperament, locale=body.locale, timezone=body.timezone
     )
+    # A persona now exists, so the temperament step is done.
+    await accounts.advance_onboarding_step(user_id, 1)
     return CreateUserResponse(
         user_id=user_id,
         temperament=_field(persona, "temperament"),
@@ -165,12 +189,16 @@ async def get_settings_route(
 
 @router.patch("/v1/users/{user_id}/settings", response_model=SettingsResponse)
 async def patch_settings(
-    user_id: MatchingUserId, body: SettingsPatch, repo: PersonaRepoDep
+    user_id: MatchingUserId,
+    body: SettingsPatch,
+    repo: PersonaRepoDep,
+    accounts: AccountRepoDep,
 ) -> SettingsResponse:
     persona = await _require_persona(repo, user_id)
     settings = dict(_field(persona, "settings") or {})
     dials = dict(settings.get("dials") or {})
-    for key, value in body.model_dump(exclude_unset=True).items():
+    patch = body.model_dump(exclude_unset=True)
+    for key, value in patch.items():
         target = dials if key in ("warmth", "directness", "humor", "initiative") else settings
         if value is None:
             target.pop(key, None)
@@ -181,7 +209,26 @@ async def patch_settings(
     else:
         settings.pop("dials", None)
     await repo.set_settings(user_id, settings)
+    await accounts.advance_onboarding_step(user_id, _settings_step(patch))
     return _settings_response(await _require_persona(repo, user_id))
+
+
+@router.patch(
+    "/v1/users/{user_id}/temperament", response_model=TemperamentPatchResponse
+)
+async def patch_temperament(
+    user_id: MatchingUserId,
+    body: TemperamentPatch,
+    repo: PersonaRepoDep,
+    accounts: AccountRepoDep,
+) -> TemperamentPatchResponse:
+    """Re-pick the temperament at any time. Explicit dials go back to that
+    temperament's defaults."""
+    if body.temperament not in TEMPERAMENTS:
+        raise HTTPException(status_code=422, detail={"code": "unknown_temperament"})
+    await repo.reseed(user_id, body.temperament)
+    await accounts.advance_onboarding_step(user_id, 1)
+    return TemperamentPatchResponse(temperament=body.temperament)
 
 
 @router.post(

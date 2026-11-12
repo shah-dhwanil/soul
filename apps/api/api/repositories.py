@@ -69,6 +69,15 @@ class AccountRepository:
         account.onboarding_step = 4
         await self._session.flush()
 
+    async def advance_onboarding_step(self, user_id: str, step: int) -> None:
+        """Move the onboarding step forward. Never backward."""
+        account = await self._account(user_id)
+        if account is None:
+            return
+        if account.onboarding_step < step:
+            account.onboarding_step = step
+        await self._session.flush()
+
 
 class FakeAccountRepo:
     """In-memory stand-in for AccountRepository, used by tests."""
@@ -108,3 +117,9 @@ class FakeAccountRepo:
             return
         row["onboarded"] = True
         row["onboarding_step"] = 4
+
+    async def advance_onboarding_step(self, user_id: str, step: int) -> None:
+        row = self.rows.get(user_id)
+        if row is None:
+            return
+        row["onboarding_step"] = max(row["onboarding_step"], step)
