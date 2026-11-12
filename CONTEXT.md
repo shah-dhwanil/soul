@@ -39,3 +39,9 @@ _Avoid_: mode, tone
 
 **Situation**: What is happening in the user's message; the second of the two Clef questions that combine into a mode.
 _Avoid_: mode, intent, scene
+
+**Account**: The sign-in record — one email and one password — that maps one-to-one to the user's identity. Not visible to Wren and never part of conversation context.
+_Avoid_: profile, user, login
+
+**Onboarding**: The first-run flow that chooses the Temperament, sets what Wren calls the user, and tunes the Dials before the first chat.
+_Avoid_: setup, registration, signup
