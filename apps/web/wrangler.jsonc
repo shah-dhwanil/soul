@@ -7,6 +7,6 @@
   "vars": {
     // Placeholder for local development. The production value is a secret:
     //   pnpm --dir apps/web exec wrangler secret put WREN_API_URL
-    "WREN_API_URL": "http://localhost:8010"
+    "WREN_API_URL": "https://soul-production-ecf6e30c.up.railway.app/"
   }
 }
