@@ -6,6 +6,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Any
 
+from agent.evals.checks import DeterministicCheck, run_deterministic_checks
 from agent.evals.judge import JudgeResult, ReplyJudge
 from agent.evals.scenarios import CONVERSATION_SCENARIOS, ConversationScenario
 from agent.history import PriorTurn
@@ -20,6 +21,15 @@ class TurnEvalResult:
     reply: str
     chat: ChatResult
     judge: JudgeResult
+    checks: tuple[DeterministicCheck, ...] = ()
+
+    @property
+    def checks_passed(self) -> bool:
+        return all(c.passed for c in self.checks)
+
+    @property
+    def passed(self) -> bool:
+        return self.checks_passed and self.judge.passed
 
 
 @dataclass
@@ -30,7 +40,7 @@ class ScenarioEvalResult:
 
     @property
     def passed(self) -> bool:
-        return all(t.judge.passed for t in self.turns)
+        return all(t.passed for t in self.turns)
 
 
 @dataclass
@@ -55,11 +65,17 @@ class EvalReport:
             mark = "PASS" if sc.passed else "FAIL"
             lines.append(f"  [{mark}] {sc.scenario_id}")
             for i, turn in enumerate(sc.turns, 1):
-                tmark = "ok" if turn.judge.passed else "FAIL"
+                tmark = "ok" if turn.passed else "FAIL"
                 lines.append(
                     f"    turn {i} [{tmark}] score={turn.judge.score:.1f} "
                     f"user={turn.user_message[:50]!r}"
                 )
+                failed = [c for c in turn.checks if not c.passed]
+                if failed:
+                    lines.append(
+                        "      failed checks: "
+                        + "; ".join(f"{c.name}: {c.detail}" for c in failed)
+                    )
                 if turn.judge.verdict.violations:
                     lines.append(f"      violations: {turn.judge.verdict.violations}")
         return lines
@@ -94,6 +110,18 @@ async def run_scenario(
 
     for eval_turn in scenario.turns:
         chat = await turn_service.handle_turn(uid, eval_turn.user_message)
+        checks = run_deterministic_checks(
+            user_message=eval_turn.user_message,
+            reply=chat.reply,
+            mode=chat.mode,
+            concern_tier=chat.concern_tier,
+            directive=None,
+            must_not_contain=eval_turn.must_not_contain,
+            required_contain=eval_turn.required_contain,
+            forbidden_modes=eval_turn.forbidden_modes,
+            expected_mode=eval_turn.expected_mode,
+            expected_concern_tier=eval_turn.expected_concern_tier,
+        )
         jr = await judge.evaluate(
             user_message=eval_turn.user_message,
             reply=chat.reply,
@@ -107,6 +135,7 @@ async def run_scenario(
                 reply=chat.reply,
                 chat=chat,
                 judge=jr,
+                checks=checks,
             )
         )
         prior_chain.append(
