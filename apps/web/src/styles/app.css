@@ -1,0 +1,31 @@
+@import 'tailwindcss' source('../');
+
+@layer base {
+  :root {
+    /* Warm pastel palette — the five tokens every surface is built from. */
+    --wren-bg: #fdf7f0;
+    --wren-surface: #fffdfa;
+    --wren-ink: #3c3229;
+    --wren-accent: #d99a7a;
+    --wren-accent-soft: #f3ded1;
+
+    --wren-ink-muted: #7a6b5c;
+    --wren-border: #ecdfd2;
+
+    --radius: 1rem;
+  }
+
+  html {
+    color-scheme: light;
+  }
+
+  body {
+    background-color: var(--wren-bg);
+    color: var(--wren-ink);
+    font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  }
+
+  .font-display {
+    font-family: 'Fraunces', ui-serif, Georgia, serif;
+  }
+}
