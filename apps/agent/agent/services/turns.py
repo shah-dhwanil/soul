@@ -32,6 +32,8 @@ class ChatResult:
     decisions: dict[str, Any]
     memory_degraded: bool
     conversation_id: UUID | None
+    mode: str | None = None
+    concern_tier: str | None = None
 
 
 class TurnService:
@@ -173,4 +175,6 @@ class TurnService:
                 decisions=result.get("decisions") or {},
                 memory_degraded=bool(result.get("memory_degraded")),
                 conversation_id=conv.id,
+                mode=conv.mode,
+                concern_tier=conv.concern_tier,
             )

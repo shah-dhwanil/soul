@@ -202,6 +202,40 @@ class PersonaRepository:
         await self._session.flush()
         return row
 
+    async def set_settings(self, user_id: str, settings: dict) -> None:
+        persona = await self.get_or_create(user_id)
+        persona.settings = settings
+        await self._session.flush()
+
+    async def reset_learned(self, user_id: str) -> None:
+        persona = await self.get_or_create(user_id)
+        persona.learned_dials = {}
+        await self._session.flush()
+
+    async def rename_trait(
+        self, user_id: str, trait_id: UUID, label: str
+    ) -> UserTrait | None:
+        result = await self._session.execute(
+            select(UserTrait).where(
+                UserTrait.id == trait_id, UserTrait.user_id == user_id
+            )
+        )
+        row = result.scalar_one_or_none()
+        if row is None:
+            return None
+        row.label = label
+        await self._session.flush()
+        return row
+
+    async def delete_trait(self, user_id: str, trait_id: UUID) -> bool:
+        result = await self._session.execute(
+            delete(UserTrait).where(
+                UserTrait.id == trait_id, UserTrait.user_id == user_id
+            )
+        )
+        await self._session.flush()
+        return bool(result.rowcount)
+
     async def delete_all(self, user_id: str) -> None:
         for model in (UserSignal, UserTrait, UserLeaning, DetectionJob, UserPersona):
             await self._session.execute(
