@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import gsap from 'gsap'
 import { Notice } from './Notice'
-import type { TranscriptItem } from '~/lib/chat'
+import { unanimatedWrenBubbles, type TranscriptItem } from '~/lib/chat'
 import { prefersReducedMotion } from '~/lib/motion'
 
 function Bubble({ role, text }: { role: 'wren' | 'user'; text: string }) {
@@ -45,22 +45,46 @@ function Divider({ label }: { label: string }) {
 export function MessageList({ items }: { items: TranscriptItem[] }) {
   const [dismissed, setDismissed] = useState<string[]>([])
   const ref = useRef<HTMLDivElement>(null)
+  const tweens = useRef<gsap.core.Tween[]>([])
+  const revealed = useRef<Element[]>([])
 
   useEffect(() => {
     const element = ref.current
     if (!element) return
     if (prefersReducedMotion()) return
-    const bubbles = element.querySelectorAll('[data-role="wren"]')
+    // Only the new bubbles animate: the history must not blink on every reply.
+    const bubbles = unanimatedWrenBubbles(element)
     if (bubbles.length === 0) return
+    revealed.current.push(...bubbles)
     const tween = gsap.fromTo(
       bubbles,
       { autoAlpha: 0, y: 10 },
-      { autoAlpha: 1, y: 0, duration: 0.5, ease: 'power2.out', stagger: 0.08 },
+      {
+        autoAlpha: 1,
+        y: 0,
+        duration: 0.5,
+        ease: 'power2.out',
+        stagger: 0.08,
+        // Hand the styles back when the reveal is done, so the bubble is
+        // exactly as visible as the others.
+        onComplete: () => {
+          gsap.set(bubbles, { clearProps: 'all' })
+        },
+      },
     )
-    return () => {
-      tween.kill()
-    }
+    tweens.current.push(tween)
   }, [items])
+
+  useEffect(() => {
+    return () => {
+      for (const tween of tweens.current) tween.kill()
+      // A reveal that is interrupted must not leave a bubble half hidden.
+      gsap.set(revealed.current, { clearProps: 'all' })
+      for (const bubble of revealed.current) {
+        bubble.removeAttribute('data-animated')
+      }
+    }
+  }, [])
 
   return (
     <div ref={ref} className="flex flex-col gap-4" data-testid="transcript">

@@ -17,7 +17,7 @@ import type {
   UserSummary,
   YouView,
 } from '~/lib/types'
-import { callApi } from './client'
+import { callApi, type CallApiOptions } from './client'
 import {
   toChatResult,
   toConversation,
@@ -39,8 +39,9 @@ import type { CookieJar } from './session'
 /** The signed-in account's id, or a failure. */
 async function requireUserId(
   cookies: CookieJar,
+  options: Partial<CallApiOptions> = {},
 ): Promise<Result<{ userId: string }>> {
-  const result = await callApi<ApiAuthUser>('/v1/auth/me', { cookies })
+  const result = await callApi<ApiAuthUser>('/v1/auth/me', { cookies, ...options })
   if (!result.ok) {
     return { ok: false, code: result.code, status: result.status }
   }
@@ -119,19 +120,50 @@ export const fetchUserSummary = createServerFn({ method: 'GET' }).handler(
 )
 
 /** The settings view: explicit, learned, effective. */
+export async function fetchSettingsFor(
+  cookies: CookieJar,
+  userId: string,
+  options: Partial<CallApiOptions> = {},
+): Promise<Result<Settings>> {
+  const result = await callApi<ApiSettings>(`/v1/users/${userId}/settings`, {
+    cookies,
+    ...options,
+  })
+  if (!result.ok) {
+    return { ok: false, code: result.code, status: result.status }
+  }
+  return { ok: true, data: toSettings(result.data) }
+}
+
+/**
+ * Forget everything Wren learned, then read the settings back.
+ *
+ * The reset endpoint answers with the (now empty) learned map only, so the
+ * settings are read again afterwards: what was set by hand is still stored,
+ * and the page must show that, not a blank slate.
+ */
+export async function resetLearnedAndReload(
+  cookies: CookieJar,
+  options: Partial<CallApiOptions> = {},
+): Promise<Result<Settings>> {
+  const user = await requireUserId(cookies, options)
+  if (!user.ok) return user
+  const reset = await callApi<{ learned: Record<string, unknown> }>(
+    `/v1/users/${user.data.userId}/settings/reset-learned`,
+    { cookies, ...options, method: 'POST' },
+  )
+  if (!reset.ok) {
+    return { ok: false, code: reset.code, status: reset.status }
+  }
+  return fetchSettingsFor(cookies, user.data.userId, options)
+}
+
 export const fetchSettings = createServerFn({ method: 'GET' }).handler(
   async (): Promise<Result<Settings>> => {
     const cookies = createServerCookieJar()
     const user = await requireUserId(cookies)
     if (!user.ok) return user
-    const result = await callApi<ApiSettings>(
-      `/v1/users/${user.data.userId}/settings`,
-      { cookies },
-    )
-    if (!result.ok) {
-      return { ok: false, code: result.code, status: result.status }
-    }
-    return { ok: true, data: toSettings(result.data) }
+    return fetchSettingsFor(cookies, user.data.userId)
   },
 )
 
@@ -167,17 +199,7 @@ export const patchSettings = createServerFn({ method: 'POST' })
 /** Forget everything Wren learned, keeping what you set by hand. */
 export const resetLearned = createServerFn({ method: 'POST' }).handler(
   async (): Promise<Result<Settings>> => {
-    const cookies = createServerCookieJar()
-    const user = await requireUserId(cookies)
-    if (!user.ok) return user
-    const result = await callApi<ApiSettings>(
-      `/v1/users/${user.data.userId}/settings/reset-learned`,
-      { cookies, method: 'POST' },
-    )
-    if (!result.ok) {
-      return { ok: false, code: result.code, status: result.status }
-    }
-    return { ok: true, data: toSettings(result.data) }
+    return resetLearnedAndReload(createServerCookieJar())
   },
 )
 

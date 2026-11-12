@@ -5,6 +5,7 @@ import type {
   LengthBand,
   Settings,
   SettingsPatch,
+  SettingValue,
 } from '~/lib/types'
 
 /**
@@ -124,4 +125,48 @@ export function patchFromValues(
   if (next.address !== previous.address) patch.address = next.address
   if (next.nickname !== previous.nickname) patch.nickname = next.nickname
   return patch
+}
+
+/**
+ * Fold a saved patch into the last known saved state.
+ *
+ * Only the fields that were sent count as saved: anything the user changed
+ * while the request was in flight is still unsaved.
+ */
+export function mergeSaved(
+  saved: SettingsValues,
+  patch: SettingsPatch,
+): SettingsValues {
+  return { ...saved, ...patch }
+}
+
+/**
+ * Put back only the fields a failed save touched.
+ *
+ * Edits made while the request was in flight stay as the user left them.
+ */
+export function rollbackValues(
+  values: SettingsValues,
+  saved: SettingsValues,
+  patch: SettingsPatch,
+): SettingsValues {
+  const rolled = { ...values }
+  for (const key of Object.keys(patch) as Array<keyof SettingsPatch>) {
+    const value = saved[key as keyof SettingsValues]
+    if (value !== undefined) {
+      ;(rolled as Record<string, unknown>)[key] = value
+    }
+  }
+  return rolled
+}
+
+/** The page state after Wren has forgotten what it learned. */
+export function settingsAfterReset(fresh: Settings): {
+  values: SettingsValues
+  learned: Record<string, SettingValue>
+} {
+  return {
+    values: valuesFromSettings(fresh),
+    learned: fresh.learned ?? {},
+  }
 }

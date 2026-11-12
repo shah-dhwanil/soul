@@ -1,9 +1,15 @@
-import { createFileRoute, redirect, useNavigate } from '@tanstack/react-router'
+import {
+  createFileRoute,
+  redirect,
+  useNavigate,
+  useRouter,
+} from '@tanstack/react-router'
 import { useState } from 'react'
 import { Button } from '~/components/ui/button'
 import { Input } from '~/components/ui/input'
 import { Label } from '~/components/ui/label'
 import { StepAccount } from '~/components/onboarding/StepAccount'
+import { defaultAuthMode } from '~/lib/auth-mode'
 import { login, me, register } from '~/server/auth'
 
 /** Where the user lands after signing in. */
@@ -51,7 +57,10 @@ export const Route = createFileRoute('/login')({
 function LoginPage() {
   const { next } = Route.useSearch()
   const navigate = useNavigate()
-  const [mode, setMode] = useState<'signin' | 'register'>('signin')
+  const router = useRouter()
+  const [mode, setMode] = useState<'signin' | 'register'>(() =>
+    defaultAuthMode(next),
+  )
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -69,6 +78,8 @@ function LoginPage() {
       return
     }
     await navigate({ href: landingPath(next, result.data.onboarded) })
+    // The header reads the session: re-run the root loader.
+    await router.invalidate()
   }
 
   async function onRegister(accountEmail: string, accountPassword: string) {
@@ -84,6 +95,7 @@ function LoginPage() {
       return
     }
     await navigate({ href: landingPath(next, result.data.onboarded) })
+    await router.invalidate()
   }
 
   if (mode === 'register') {

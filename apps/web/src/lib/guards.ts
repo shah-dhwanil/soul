@@ -7,9 +7,6 @@ import type { AuthUser } from '~/lib/types'
  * router or a browser.
  */
 
-/** Routes that need a signed-in account. */
-export const PROTECTED_PATHS = ['/chat', '/settings', '/you', '/onboarding'] as const
-
 /** A redirect the router can act on. */
 export type GuardRedirect = { href: string }
 

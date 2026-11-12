@@ -4,7 +4,11 @@ import { Composer } from '~/components/chat/Composer'
 import { MessageList } from '~/components/chat/MessageList'
 import { TypingIndicator } from '~/components/chat/TypingIndicator'
 import { Button } from '~/components/ui/button'
-import { appendTurn, type TranscriptItem } from '~/lib/chat'
+import {
+  appendReply,
+  appendUserMessage,
+  type ChatState,
+} from '~/lib/chat'
 import { sessionGuard } from '~/server/session-guard'
 import {
   fetchUserSummary,
@@ -36,30 +40,27 @@ export const Route = createFileRoute('/chat')({
 
 function ChatPage() {
   const { firstLine } = Route.useLoaderData()
-  const [items, setItems] = useState<TranscriptItem[]>(() => [
-    { id: 'opener', type: 'message', role: 'wren', text: firstLine },
-  ])
+  const [state, setState] = useState<ChatState>(() => ({
+    items: [{ id: 'opener', type: 'message', role: 'wren', text: firstLine }],
+    failedText: null,
+  }))
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [failed, setFailed] = useState<string | null>(null)
 
-  async function send(text: string) {
+  async function send(text: string, isRetry = false) {
+    if (!isRetry) {
+      // The message goes into the transcript once, whether it works or not.
+      setState((current) => ({
+        ...current,
+        items: appendUserMessage(current.items, text),
+      }))
+    }
     setPending(true)
     setError(null)
     const result = await sendChat({ data: { message: text } })
     setPending(false)
     if (!result.ok) {
-      // The message stays in the transcript so nothing the user wrote is lost.
-      setItems((current) => [
-        ...current,
-        {
-          id: `user-${current.length}`,
-          type: 'message',
-          role: 'user',
-          text,
-        },
-      ])
-      setFailed(text)
+      setState((current) => ({ ...current, failedText: text }))
       setError(
         result.code === 'rate_limited'
           ? 'Too many messages at once. Give it a moment.'
@@ -67,8 +68,11 @@ function ChatPage() {
       )
       return
     }
-    setFailed(null)
-    setItems((current) => appendTurn(current, text, result.data))
+    setState((current) => ({
+      ...current,
+      items: appendReply(current.items, result.data),
+      failedText: null,
+    }))
   }
 
   async function newConversation() {
@@ -80,14 +84,17 @@ function ChatPage() {
       setError('A new conversation did not start. Try again.')
       return
     }
-    setItems([
-      {
-        id: `opener-${result.data.conversationId}`,
-        type: 'message',
-        role: 'wren',
-        text: result.data.firstMessage,
-      },
-    ])
+    setState({
+      items: [
+        {
+          id: `opener-${result.data.conversationId}`,
+          type: 'message',
+          role: 'wren',
+          text: result.data.firstMessage,
+        },
+      ],
+      failedText: null,
+    })
   }
 
   return (
@@ -105,7 +112,7 @@ function ChatPage() {
         </Button>
       </div>
 
-      <MessageList items={items} />
+      <MessageList items={state.items} />
 
       {pending ? (
         <div className="wren-card w-fit rounded-bl-md">
@@ -116,11 +123,11 @@ function ChatPage() {
       {error ? (
         <div role="alert" className="flex items-center gap-4 text-sm text-[#a2442c]">
           <span>{error}</span>
-          {failed ? (
+          {state.failedText ? (
             <button
               type="button"
               className="rounded-full border border-[var(--wren-border)] px-3 py-1 text-[var(--wren-ink)]"
-              onClick={() => send(failed)}
+              onClick={() => send(state.failedText as string, true)}
             >
               Try again
             </button>

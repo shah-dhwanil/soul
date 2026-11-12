@@ -8,9 +8,11 @@ import {
 } from '@tanstack/react-router'
 import { QueryClientProvider } from '@tanstack/react-query'
 import * as React from 'react'
+import { useNavigate, useRouter } from '@tanstack/react-router'
 import type { QueryClient } from '@tanstack/react-query'
+import { AppNav } from '~/components/shared/AppNav'
 import appCss from '~/styles/app.css?url'
-import { me } from '~/server/auth'
+import { logout, me } from '~/server/auth'
 
 export const Route = createRootRouteWithContext<{
   queryClient: QueryClient
@@ -50,6 +52,17 @@ export const Route = createRootRouteWithContext<{
 function RootComponent() {
   const { queryClient } = Route.useRouteContext()
   const { user } = Route.useLoaderData()
+  const navigate = useNavigate()
+  const router = useRouter()
+
+  async function signOut() {
+    await logout()
+    await navigate({ href: '/' })
+    // The header reads the session: re-run the root loader.
+    await router.invalidate()
+    await queryClient.resetQueries()
+  }
+
   return (
     <html lang="en">
       <head>
@@ -62,23 +75,7 @@ function RootComponent() {
               <Link to="/" className="font-display text-lg tracking-tight">
                 Wren
               </Link>
-              <nav className="flex items-center gap-4 text-sm">
-                {user ? (
-                  <Link
-                    to="/chat"
-                    className="rounded-full bg-[var(--wren-accent)] px-4 py-2 text-[var(--wren-ink)] transition-opacity hover:opacity-90"
-                  >
-                    Chat
-                  </Link>
-                ) : (
-                  <Link
-                    to="/onboarding"
-                    className="rounded-full bg-[var(--wren-accent)] px-4 py-2 text-[var(--wren-ink)] transition-opacity hover:opacity-90"
-                  >
-                    Begin
-                  </Link>
-                )}
-              </nav>
+              <AppNav user={user} onSignOut={signOut} />
             </header>
             <main className="flex-1">
               <Outlet />

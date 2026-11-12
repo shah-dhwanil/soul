@@ -1,7 +1,10 @@
 import { describe, expect, test } from 'vitest'
 import {
   isTemperamentDefault,
+  mergeSaved,
   patchFromValues,
+  rollbackValues,
+  settingsAfterReset,
   valuesFromSettings,
 } from '~/lib/settings'
 import type { Settings } from '~/lib/types'
@@ -67,5 +70,32 @@ describe('settings values', () => {
     expect(isTemperamentDefault(stored, 'directness')).toBe(true)
     expect(isTemperamentDefault(stored, 'humor')).toBe(true)
     expect(values.warmth).toBe(8)
+  })
+
+  test('a successful save merges only what was sent', () => {
+    const saved = valuesFromSettings(stored)
+    const merged = mergeSaved(saved, { warmth: 7 })
+    expect(merged.warmth).toBe(7)
+    expect(merged.address).toBe('Sam')
+  })
+
+  test('a failed save rolls back only the fields it sent', () => {
+    const saved = valuesFromSettings(stored)
+    const edited = { ...saved, warmth: 6, nickname: 'Doc' }
+    const rolled = rollbackValues(edited, saved, { warmth: 6 })
+    expect(rolled.warmth).toBe(8)
+    expect(rolled.nickname).toBe('Doc')
+  })
+
+  test('a reset keeps what was set by hand', () => {
+    const fresh: Settings = {
+      explicit: { warmth: 8, address: 'Sam' },
+      learned: {},
+      effective: { warmth: 8, address: 'Sam', directness: 6, humor: 4, initiative: 3 },
+    }
+    const state = settingsAfterReset(fresh)
+    expect(state.values.address).toBe('Sam')
+    expect(state.values.warmth).toBe(8)
+    expect(state.learned).toEqual({})
   })
 })

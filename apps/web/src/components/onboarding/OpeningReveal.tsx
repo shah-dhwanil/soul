@@ -23,20 +23,28 @@ export function OpeningReveal({
     const element = ref.current
     if (!element) return
     if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return
-    const tween = gsap.fromTo(
-      element.querySelectorAll('[data-reveal]'),
-      { autoAlpha: 0, y: 20 },
-      {
-        autoAlpha: 1,
-        y: 0,
-        duration: 0.8,
-        ease: 'power2.out',
-        stagger: 0.15,
-        delay: 0.1,
-      },
-    )
+    const targets = element.querySelectorAll('[data-reveal]')
+    // A context reverts the styles it changed, so an interrupted reveal
+    // never leaves the opening line half hidden.
+    const context = gsap.context(() => {
+      gsap.fromTo(
+        targets,
+        { autoAlpha: 0, y: 20 },
+        {
+          autoAlpha: 1,
+          y: 0,
+          duration: 0.8,
+          ease: 'power2.out',
+          stagger: 0.15,
+          delay: 0.1,
+          onComplete: () => {
+            gsap.set(targets, { clearProps: 'all' })
+          },
+        },
+      )
+    }, element)
     return () => {
-      tween.kill()
+      context.revert()
     }
   }, [ref])
 

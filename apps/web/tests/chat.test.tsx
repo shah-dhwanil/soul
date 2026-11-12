@@ -2,7 +2,7 @@ import { describe, expect, test, vi } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { Composer } from '~/components/chat/Composer'
 import { MessageList } from '~/components/chat/MessageList'
-import { appendTurn, canSend, type TranscriptItem } from '~/lib/chat'
+import { appendTurn, canSend, chatReducer, unanimatedWrenBubbles, type TranscriptItem } from '~/lib/chat'
 
 const reply = {
   threadId: 'th1',
@@ -84,5 +84,50 @@ describe('chat', () => {
     expect(canSend('   ')).toBe(false)
     expect(canSend('')).toBe(false)
     expect(canSend('hi')).toBe(true)
+  })
+
+  test('a retry does not duplicate the user message', () => {
+    let state = chatReducer(
+      { items: [], failedText: null },
+      { type: 'user-message', text: 'hello' },
+    )
+    state = chatReducer(state, { type: 'failed', text: 'hello' })
+    expect(state.failedText).toBe('hello')
+
+    // The retry succeeds: only the reply is appended.
+    state = chatReducer(state, { type: 'reply', result: reply })
+    const userMessages = state.items.filter(
+      (item) => item.type === 'message' && item.role === 'user',
+    )
+    expect(userMessages).toHaveLength(1)
+    expect(state.failedText).toBeNull()
+  })
+
+  test('a repeated failure keeps one user message', () => {
+    let state = chatReducer(
+      { items: [], failedText: null },
+      { type: 'user-message', text: 'hello' },
+    )
+    state = chatReducer(state, { type: 'failed', text: 'hello' })
+    state = chatReducer(state, { type: 'failed', text: 'hello' })
+    expect(
+      state.items.filter(
+        (item) => item.type === 'message' && item.role === 'user',
+      ),
+    ).toHaveLength(1)
+  })
+
+  test('only new wren bubbles are animated', () => {
+    const container = document.createElement('div')
+    container.innerHTML = `
+      <div data-role="wren" data-animated="true">old</div>
+      <div data-role="wren">new</div>
+      <div data-role="user">mine</div>
+    `
+    const fresh = unanimatedWrenBubbles(container)
+    expect(fresh).toHaveLength(1)
+    expect(fresh[0]?.textContent).toBe('new')
+    // The helper marks what it handed out, so it never animates twice.
+    expect(unanimatedWrenBubbles(container)).toHaveLength(0)
   })
 })

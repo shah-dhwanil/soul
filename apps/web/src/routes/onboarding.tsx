@@ -1,4 +1,9 @@
-import { createFileRoute, redirect, useNavigate } from '@tanstack/react-router'
+import {
+  createFileRoute,
+  redirect,
+  useNavigate,
+  useRouter,
+} from '@tanstack/react-router'
 import { useMutation } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
 import { BeatProgress } from '~/components/onboarding/BeatProgress'
@@ -53,6 +58,7 @@ export const Route = createFileRoute('/onboarding')({
 function OnboardingPage() {
   const { user: initialUser, seeds, summary, settings } = Route.useLoaderData()
   const navigate = useNavigate()
+  const router = useRouter()
 
   const [user, setUser] = useState<AuthUser | null>(initialUser)
   const [beat, setBeat] = useState<BeatKey>(() => startingBeat(initialUser))
@@ -144,6 +150,8 @@ function OnboardingPage() {
         return
       }
       await navigate({ href: '/chat' })
+      // The header reads the session: re-run the root loader.
+      await router.invalidate()
     },
   })
 

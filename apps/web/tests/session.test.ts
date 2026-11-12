@@ -129,3 +129,41 @@ describe('me', () => {
     expect(fetchImpl).not.toHaveBeenCalled()
   })
 })
+
+describe('network failures', () => {
+  test('a dead API does not throw across the server boundary', async () => {
+    const cookies = jarWith({ [ACCESS_COOKIE]: 'access-value' })
+    const fetchImpl = vi.fn(async () => {
+      throw new TypeError('fetch failed')
+    })
+
+    const result = await callApi('/v1/auth/me', {
+      cookies,
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      baseUrl: 'http://api.test',
+    })
+
+    expect(result).toEqual({ ok: false, code: 'network_error', status: 0 })
+  })
+
+  test('a dead API during refresh does not throw either', async () => {
+    const cookies = jarWith({
+      [ACCESS_COOKIE]: 'access-value',
+      [REFRESH_COOKIE]: 'refresh-value',
+    })
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input).endsWith('/v1/auth/refresh')) {
+        throw new TypeError('fetch failed')
+      }
+      return jsonResponse({ code: 'invalid_token' }, 401)
+    })
+
+    const result = await callApi('/v1/auth/me', {
+      cookies,
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      baseUrl: 'http://api.test',
+    })
+
+    expect(result).toEqual({ ok: false, code: 'network_error', status: 0 })
+  })
+})

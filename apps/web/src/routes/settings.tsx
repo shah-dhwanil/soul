@@ -15,7 +15,11 @@ import {
   DialogTrigger,
 } from '~/components/ui/dialog'
 import {
+  isTemperamentDefault,
+  mergeSaved,
   patchFromValues,
+  rollbackValues,
+  settingsAfterReset,
   valuesFromSettings,
   type SettingsValues,
 } from '~/lib/settings'
@@ -123,9 +127,8 @@ function SettingsPage() {
     settings?.learned ?? {},
   )
   const [resetting, setResetting] = useState(false)
+  const [resetOpen, setResetOpen] = useState(false)
 
-  const valuesRef = useRef(values)
-  valuesRef.current = values
   const savedRef = useRef(saved)
   savedRef.current = saved
 
@@ -139,11 +142,13 @@ function SettingsPage() {
       if (!result.ok) {
         setStatus('error')
         setError('That did not save. Put it back the way it was.')
-        setValues(savedRef.current)
+        // Put back only what this save touched.
+        setValues((current) => rollbackValues(current, savedRef.current, patch))
         return
       }
       setStatus('saved')
-      setSaved(valuesRef.current)
+      // Only what was sent counts as saved.
+      setSaved((current) => mergeSaved(current, patch))
       setError(null)
     }, 500)
     return () => clearTimeout(timer)
@@ -165,10 +170,13 @@ function SettingsPage() {
       return
     }
     setError(null)
-    setLearned(result.data.learned)
-    const next = valuesFromSettings(result.data)
-    setValues(next)
-    setSaved(next)
+    // The settings are read back after the reset, so what was set by hand
+    // is still on screen.
+    const state = settingsAfterReset(result.data)
+    setLearned(state.learned)
+    setValues(state.values)
+    setSaved(state.values)
+    setResetOpen(false)
   }
 
   const learnedEntries = Object.entries(learned)
@@ -205,7 +213,7 @@ function SettingsPage() {
             min={dial.min}
             max={dial.max}
             value={values[dial.key]}
-            isDefault={settings?.explicit?.[dial.key] === undefined}
+            isDefault={isTemperamentDefault(settings, dial.key)}
             onChange={(next) => update(dial.key, next)}
           />
         ))}
@@ -257,7 +265,7 @@ function SettingsPage() {
           </ul>
         )}
 
-        <Dialog>
+        <Dialog open={resetOpen} onOpenChange={setResetOpen}>
           <DialogTrigger asChild>
             <Button variant="outline" className="w-fit rounded-full">
               Reset what I learned

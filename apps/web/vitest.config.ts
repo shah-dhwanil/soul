@@ -11,7 +11,8 @@ export default defineConfig({
   },
   test: {
     environment: 'jsdom',
-    globals: false,
+    // Globals on so testing-library cleans the DOM between tests.
+    globals: true,
     include: ['tests/**/*.test.ts', 'tests/**/*.test.tsx'],
   },
 })

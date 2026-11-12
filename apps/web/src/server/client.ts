@@ -16,6 +16,12 @@ import {
  * silent retry.
  */
 
+/** The API could not be reached at all. */
+export const NETWORK_ERROR = 'network_error'
+
+/** Raised internally when the API cannot be reached; never crosses a boundary. */
+class NetworkError extends Error {}
+
 export interface CallApiOptions {
   cookies: CookieJar
   method?: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE'
@@ -74,11 +80,16 @@ async function refreshAccessToken(
   if (!refresh) {
     return { ok: false, code: 'invalid_refresh_token', status: 401 }
   }
-  const response = await fetchImpl(`${baseUrl}/v1/auth/refresh`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ refresh_token: refresh }),
-  })
+  let response: Response
+  try {
+    response = await fetchImpl(`${baseUrl}/v1/auth/refresh`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ refresh_token: refresh }),
+    })
+  } catch {
+    return { ok: false, code: NETWORK_ERROR, status: 0 }
+  }
   const parsed = await readResult<{ access_token?: string }>(response)
   if (!parsed.ok) {
     return { ok: false, code: parsed.code, status: parsed.status }
@@ -103,7 +114,7 @@ export async function callApi<T>(
   const fetchImpl = options.fetchImpl ?? globalThis.fetch
   const auth = options.auth ?? true
 
-  const send = (token: string | undefined): Promise<Response> => {
+  const send = async (token: string | undefined): Promise<Response> => {
     const headers: Record<string, string> = {
       accept: 'application/json',
       ...options.headers,
@@ -114,15 +125,27 @@ export async function callApi<T>(
     if (auth && token) {
       headers['authorization'] = `Bearer ${token}`
     }
-    return fetchImpl(`${baseUrl}${path}`, {
-      method: options.method ?? 'GET',
-      headers,
-      body:
-        options.body === undefined ? undefined : JSON.stringify(options.body),
-    })
+    try {
+      return await fetchImpl(`${baseUrl}${path}`, {
+        method: options.method ?? 'GET',
+        headers,
+        body:
+          options.body === undefined
+            ? undefined
+            : JSON.stringify(options.body),
+      })
+    } catch {
+      throw new NetworkError()
+    }
   }
 
-  let response = await send(options.cookies.get(ACCESS_COOKIE))
+  let response: Response
+  try {
+    response = await send(options.cookies.get(ACCESS_COOKIE))
+  } catch {
+    // The API is unreachable: report it, never throw across the boundary.
+    return { ok: false, code: NETWORK_ERROR, status: 0 }
+  }
 
   if (response.status === 401 && auth) {
     const refreshed = await refreshAccessToken(
@@ -134,12 +157,12 @@ export async function callApi<T>(
       return { ok: false, code: refreshed.code, status: refreshed.status }
     }
     // Exactly one retry with the new access token.
-    response = await send(refreshed.token)
+    try {
+      response = await send(refreshed.token)
+    } catch {
+      return { ok: false, code: NETWORK_ERROR, status: 0 }
+    }
   }
 
   return readResult<T>(response)
-}
-
-function cookies_get(cookies: CookieJar): string | undefined {
-  return cookies.get(ACCESS_COOKIE)
 }
