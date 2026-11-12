@@ -3,7 +3,7 @@ from typing import Any
 from langchain_cloudflare import CloudflareWorkersAIDecisionModel
 
 from agent.config import Settings
-from agent.decision_parsing import parse_thread_and_memory
+from agent.decision_parsing import parse_persona_signals, parse_thread_and_memory
 from agent.history import ChatTurn, format_turns_for_clef
 
 
@@ -97,6 +97,86 @@ class DecisionModel:
         }
 
     @staticmethod
+    def concern_tier_question() -> dict[str, Any]:
+        return {
+            "concern_tier": {
+                "type": "choice",
+                "instructions": (
+                    "Is the latest user message showing that the person may "
+                    "want to die or hurt themselves? Answer acute if they "
+                    "state intent, a plan, means or timing, an attempt in "
+                    "progress, or danger to someone else. Answer concern if "
+                    "they say something indirect or passive — 'everyone would "
+                    "be better off without me', 'I wish I could disappear', "
+                    "'what's the point', persistent hopelessness, or past "
+                    "self-harm with no current intent stated. Answer normal "
+                    "otherwise. Judge only the latest user message."
+                ),
+                "criteria": {
+                    "normal": "No sign of suicidal thoughts or self-harm.",
+                    "concern": (
+                        "Indirect or passive ideation, hopelessness, or past "
+                        "self-harm with no current intent."
+                    ),
+                    "acute": (
+                        "Stated intent, plan, means, timing, attempt in "
+                        "progress, or danger to someone else."
+                    ),
+                },
+            }
+        }
+
+    @staticmethod
+    def register_question() -> dict[str, Any]:
+        return {
+            "register": {
+                "type": "choice",
+                "instructions": (
+                    "Is the latest user message playful or serious? Answer "
+                    "playful when they are joking, bantering, or teasing. "
+                    "Answer serious when they are upset, hurting, or handling "
+                    "something heavy. Answer neutral otherwise."
+                ),
+                "criteria": {
+                    "playful": "Joking, bantering, or teasing.",
+                    "serious": "Upset, hurting, or handling something heavy.",
+                    "neutral": "Neither clearly playful nor serious.",
+                },
+            }
+        }
+
+    @staticmethod
+    def situation_question() -> dict[str, Any]:
+        return {
+            "situation": {
+                "type": "choice",
+                "instructions": (
+                    "What is happening in the latest user message? Answer "
+                    "venting when they are unloading or grieving without "
+                    "asking for input. Answer thinking_aloud when they are "
+                    "working something out aloud. Answer asking_decision when "
+                    "they ask what to do. Answer overwhelmed when they are "
+                    "drowning or attacking themselves. Answer good_news when "
+                    "they are sharing good news. Answer banter when they are "
+                    "playing. Answer angry_at_wren when they are annoyed at "
+                    "the assistant. Answer spiraling when they are panicking "
+                    "or spiraling. Answer everyday_smalltalk otherwise."
+                ),
+                "criteria": {
+                    "everyday_smalltalk": "Ordinary chat.",
+                    "venting": "Unloading or grieving without asking for input.",
+                    "thinking_aloud": "Working something out aloud.",
+                    "asking_decision": "Asking what to do.",
+                    "overwhelmed": "Drowning or attacking themselves.",
+                    "good_news": "Sharing good news.",
+                    "banter": "Playing around.",
+                    "angry_at_wren": "Annoyed at the assistant.",
+                    "spiraling": "Panicking or spiraling.",
+                },
+            }
+        }
+
+    @staticmethod
     def default_questions() -> dict[str, Any]:
         merged: dict[str, Any] = {}
         merged.update(DecisionModel.thread_continue_question())
@@ -104,6 +184,9 @@ class DecisionModel:
         merged.update(DecisionModel.is_memory_required_question())
         merged.update(DecisionModel.analyze_user_chat())
         merged.update(DecisionModel.agent_emotion())
+        merged.update(DecisionModel.concern_tier_question())
+        merged.update(DecisionModel.register_question())
+        merged.update(DecisionModel.situation_question())
         return merged
 
     async def get_decisions(
@@ -121,9 +204,11 @@ class DecisionModel:
             split_threshold=self._settings.thread_split_threshold,
             memory_threshold=self._settings.memory_required_threshold,
         )
+        signals = parse_persona_signals(raw)
         return {
             "raw": raw,
             "inject_previous_chat": inject,
             "split_thread": split,
             "memory_required": memory,
+            "persona_signals": signals,
         }
