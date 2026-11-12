@@ -29,9 +29,10 @@ function errorMessage(code: string): string {
 }
 
 export const Route = createFileRoute('/login')({
-  validateSearch: (search: Record<string, unknown>) => ({
-    next: typeof search.next === 'string' ? search.next : undefined,
-  }),
+  validateSearch: (search: Record<string, unknown>) => {
+    const next = typeof search.next === 'string' ? search.next : undefined
+    return next ? { next } : {}
+  },
   beforeLoad: async ({ location, search }) => {
     const result = await me()
     const user = result.ok ? result.data : null

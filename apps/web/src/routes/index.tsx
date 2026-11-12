@@ -1,15 +1,23 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { Button } from '~/components/ui/button'
+import { ClosingCta, Footer } from '~/components/landing/ClosingCta'
+import { Faq } from '~/components/landing/Faq'
+import { Hero } from '~/components/landing/Hero'
+import { TemperamentTeaser } from '~/components/landing/TemperamentTeaser'
+import { WhatIs } from '~/components/landing/WhatIs'
 
 export const Route = createFileRoute('/')({
-  component: () => (
-    <div className="mx-auto w-full max-w-5xl px-6 py-24">
-      <h1 className="font-display text-4xl">A friend who pays attention.</h1>
-      <p className="mt-4 max-w-prose text-[var(--wren-ink-muted)]">
-        Wren is an AI that remembers what you tell it and says what it actually
-        thinks. This page is a placeholder while the real one is built.
-      </p>
-      <Button className="mt-8 rounded-full px-6">Begin</Button>
-    </div>
-  ),
+  component: LandingPage,
 })
+
+function LandingPage() {
+  return (
+    <div className="flex min-h-dvh flex-col">
+      <Hero />
+      <WhatIs />
+      <TemperamentTeaser />
+      <Faq />
+      <ClosingCta />
+      <Footer />
+    </div>
+  )
+}
