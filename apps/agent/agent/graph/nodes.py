@@ -6,10 +6,37 @@ logger = logging.getLogger(__name__)
 
 from langchain_core.runnables import RunnableConfig
 
-from agent.graph.deps import GraphDeps, deps_from_config
+from agent.graph.deps import deps_from_config
 from agent.graph.state import TurnState
 from agent.history import ChatTurn
+from agent.persona.constants.dials import Dials
+from agent.persona.constants.modes import Mode
+from agent.persona.constants.temperaments import TEMPERAMENTS
 from agent.persona.context import prompt_context_from_turn
+from agent.persona.directive import TurnDirective
+
+# Temporary stubs until Task 14 wires real directive/persona state into the graph.
+_STUB_DIRECTIVE = TurnDirective(
+    mode=Mode.EVERYDAY,
+    length_band=(8, 25),
+    max_bubbles=3,
+    question_allowed=True,
+    advice_allowed=False,
+    humor_allowed=False,
+    callback_allowed=True,
+    trait_allowed=False,
+    concern_tier="normal",
+    dependency_level=0,
+    stage=1,
+    closing_signal=False,
+    reason_codes=(),
+)
+_STUB_PERSONA_STATE = {
+    "temperament": TEMPERAMENTS["steady"],
+    "dials": Dials(formality=2, warmth=7, directness=6, humor=4, initiative=3),
+    "stage": 1,
+    "traits": [],
+}
 
 
 async def classify_parallel(state: TurnState, config: RunnableConfig) -> TurnState:
@@ -135,6 +162,9 @@ async def assemble_and_generate(state: TurnState, config: RunnableConfig) -> Tur
         decisions=state.get("decisions"),
         memories=state.get("memories") or [],
         configured_resources=crisis,
+        # TODO(Task 14): replace stub directive/persona_state with real values.
+        directive=_STUB_DIRECTIVE,
+        persona_state=_STUB_PERSONA_STATE,
     )
     reply = await deps.query_llm.generate_response(
         state["user_message"],

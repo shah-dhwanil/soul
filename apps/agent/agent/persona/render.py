@@ -11,8 +11,8 @@ def render_wren_system_prompt(ctx: WrenPromptContext) -> str:
         "dials": ctx.dials,
         "stage_permissions": ctx.stage_permissions,
         "active_traits": ctx.active_traits,
-        "mode_block": "",
-        "turn_directive": "",
+        "mode_block": ctx.mode_block,
+        "turn_directive": ctx.turn_directive,
         "banned_phrases": ctx.banned_phrases,
         "configured_resources": ctx.configured_resources,
     }

@@ -13,7 +13,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from agent.config import Settings
 from agent.evals.scenarios import EvalTurn
 from agent.history import PriorTurn
-from agent.persona.defaults import DEFAULT_BANNED_PHRASES
+from agent.persona.constants.banned import BANNED_PHRASES
 
 logger = logging.getLogger(__name__)
 
@@ -125,7 +125,7 @@ class ReplyJudge:
 {turn.rubric}
 
 Banned phrase reference (non-exhaustive):
-{DEFAULT_BANNED_PHRASES[:800]}
+{", ".join(BANNED_PHRASES)[:800]}
 
 Prior chat (may be empty):
 {history or "(none)"}
