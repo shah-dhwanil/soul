@@ -70,6 +70,16 @@ class Settings(BaseSettings):
     memory_ingest_enabled: bool = Field(default=True)
     graphiti_build_indices_on_startup: bool = Field(default=False)
 
+    persona_version: str = "wren-2.2"
+    default_locale: str = "en-US"
+    default_timezone: str = "UTC"
+    detection_worker_enabled: bool = True
+    detection_poll_interval_s: float = 5.0
+    detection_max_attempts: int = 5
+    stage_recompute_interval_minutes: int = 60
+    attunement_review_interval_minutes: int = 60
+    attunement_review_every_turns: int = 8
+
     @model_validator(mode="after")
     def _normalize_models(self) -> "Settings":
         self.groq_agent_model = _normalize_groq_model_id(self.groq_agent_model)
