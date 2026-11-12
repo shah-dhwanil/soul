@@ -5,6 +5,7 @@ import pytest
 from fastapi import FastAPI
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
+from api.errors import install_error_handler
 from api.models import Account
 from api.routes import auth
 
@@ -28,6 +29,7 @@ async def test_auth_routes_work_against_the_real_accounts_table():
     session_factory = async_sessionmaker(engine, expire_on_commit=False)
     app = FastAPI()
     app.state.session_factory = session_factory
+    install_error_handler(app)
     app.include_router(auth.router)
     transport = httpx.ASGITransport(app=app)
     try:
@@ -56,7 +58,7 @@ async def test_auth_routes_work_against_the_real_accounts_table():
                 json={"email": EMAIL, "password": PASSWORD},
             )
             assert duplicate.status_code == 409
-            assert duplicate.json()["detail"]["code"] == "email_exists"
+            assert duplicate.json()["code"] == "email_exists"
 
             login = await client.post(
                 "/v1/auth/login",

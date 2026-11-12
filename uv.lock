@@ -2389,12 +2389,14 @@ version = "0.1.0"
 source = { editable = "apps/api" }
 dependencies = [
     { name = "agent" },
+    { name = "alembic" },
     { name = "argon2-cffi" },
     { name = "email-validator" },
     { name = "fastapi" },
     { name = "pydantic-settings" },
     { name = "pyjwt" },
     { name = "python-dotenv" },
+    { name = "sqlalchemy", extra = ["asyncio"] },
     { name = "uvicorn", extra = ["standard"] },
 ]
 
@@ -2408,12 +2410,14 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "agent", editable = "apps/agent" },
+    { name = "alembic", specifier = ">=1.20.1" },
     { name = "argon2-cffi", specifier = ">=23.1.0" },
     { name = "email-validator", specifier = ">=2.2.0" },
     { name = "fastapi", specifier = ">=0.115.0" },
     { name = "pydantic-settings", specifier = ">=2.16.2" },
     { name = "pyjwt", specifier = ">=2.10.0" },
     { name = "python-dotenv", specifier = ">=1.0.0" },
+    { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.1.8" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.32.0" },
 ]
 

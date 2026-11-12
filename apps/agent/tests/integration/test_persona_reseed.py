@@ -24,11 +24,13 @@ async def test_reseed_replaces_temperament_and_explicit_dials(session_factory):
         steady = asdict(TEMPERAMENTS["steady"].default_dials)
         assert row["temperament"] == "steady"
         assert row["dials"] == steady
-        assert row["settings"]["dials"] == steady
+        # The explicit dial overrides are dropped by the re-seed.
+        assert "dials" not in row["settings"]
 
         stored = await repo.get(USER_ID)
         assert stored.temperament == "steady"
-        assert stored.settings["dials"] == steady
+        assert stored.dials == steady
+        assert "dials" not in stored.settings
 
         await session.execute(
             delete(UserPersona).where(UserPersona.user_id == USER_ID)

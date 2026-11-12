@@ -3,6 +3,7 @@ import os
 
 import pytest
 from sqlalchemy import delete, inspect
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from api.models import Account
@@ -55,6 +56,13 @@ def test_accounts_table_exists_and_repository_roundtrips():
                 row = await repo.get_by_user_id(USER_ID)
                 assert row["onboarded"] is True
                 assert row["onboarding_step"] == 4
+
+                # The unique email index really is enforced by the database.
+                with pytest.raises(IntegrityError):
+                    await repo.create(
+                        email=EMAIL, password_hash="h2", user_id="another-user"
+                    )
+                await session.rollback()
 
                 await session.execute(
                     delete(Account).where(Account.user_id == USER_ID)

@@ -46,10 +46,10 @@ class FakePersonaRepo:
 
         row = await self.get_or_create(user_id, temperament=temperament)
         dials = asdict(TEMPERAMENTS[temperament].default_dials)
+        settings = dict(row.get("settings") or {})
+        settings.pop("dials", None)
         row["temperament"] = temperament
         row["dials"] = dict(dials)
-        settings = dict(row.get("settings") or {})
-        settings["dials"] = dict(dials)
         row["settings"] = settings
         return row
 
@@ -86,19 +86,19 @@ def test_temperaments_endpoint_lists_four_seeds(client):
 def test_create_user_requires_bearer_token(client):
     resp = client.post("/v1/users", json={"temperament": "steady", "locale": "en-US", "timezone": "UTC"})
     assert resp.status_code == 401
-    assert resp.json()["detail"]["code"] == "missing_token"
+    assert resp.json()["code"] == "missing_token"
 
 
 def test_missing_bearer_token_gets_401(client):
     resp = client.get("/v1/users/u1/traits")
     assert resp.status_code == 401
-    assert resp.json()["detail"]["code"] == "missing_token"
+    assert resp.json()["code"] == "missing_token"
 
 
 def test_x_user_id_header_alone_is_rejected(client):
     resp = client.get("/v1/users/u1/traits", headers={"X-USER-ID": "u1"})
     assert resp.status_code == 401
-    assert resp.json()["detail"]["code"] == "missing_token"
+    assert resp.json()["code"] == "missing_token"
 
 
 def test_expired_access_token_gets_invalid_token(client):
@@ -106,7 +106,7 @@ def test_expired_access_token_gets_invalid_token(client):
         "/v1/users/u1/traits", headers={"Authorization": expired_access_token("u1")}
     )
     assert resp.status_code == 401
-    assert resp.json()["detail"]["code"] == "invalid_token"
+    assert resp.json()["code"] == "invalid_token"
 
 
 def test_create_user_is_idempotent(client):
@@ -147,12 +147,19 @@ def _registered(client, email="a@b.co"):
 def test_temperament_patch_reseeds_persona(client, persona_repo):
     from dataclasses import asdict
 
+    from agent.services.persona_state import _resolve_dials
+
     headers = auth_headers("u1")
     client.post(
         "/v1/users",
         json={"temperament": "wry", "locale": "en-US", "timezone": "UTC"},
         headers=headers,
     )
+    # The user tunes a dial before re-picking a temperament.
+    client.patch(
+        "/v1/users/u1/settings", json={"warmth": 8}, headers=headers
+    )
+
     resp = client.patch(
         "/v1/users/u1/temperament",
         json={"temperament": "steady"},
@@ -164,8 +171,20 @@ def test_temperament_patch_reseeds_persona(client, persona_repo):
     row = persona_repo.rows["u1"]
     steady = asdict(TEMPERAMENTS["steady"].default_dials)
     assert row["temperament"] == "steady"
-    assert row["settings"]["dials"] == steady
     assert row["dials"] == steady
+    # The user's explicit dial overrides do not survive the re-seed, so the
+    # dials are the new temperament's defaults.
+    assert "dials" not in row["settings"]
+
+    # The settings view and the dials Wren actually runs with agree.
+    runtime = _resolve_dials(
+        TEMPERAMENTS["steady"], row["dials"], row["learned_dials"]
+    )
+    effective = client.get("/v1/users/u1/settings", headers=headers).json()[
+        "effective"
+    ]
+    for name in ("formality", "warmth", "directness", "humor", "initiative"):
+        assert effective[name] == getattr(runtime, name)
 
 
 def test_temperament_patch_rejects_unknown_id(client):

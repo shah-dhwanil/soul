@@ -1,8 +1,8 @@
 """API-owned ORM models.
 
 These live in the `api` Postgres schema, separate from the `agent` schema that
-`apps/agent` owns. The API never writes to agent tables, and the agent never
-sees an Account row: it only ever sees the `user_id` string.
+`apps/agent` owns. The `accounts` table is written only by the API app, and
+the agent never reads an Account row: it only ever sees the `user_id` string.
 """
 
 from datetime import datetime

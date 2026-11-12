@@ -15,3 +15,13 @@ def _fresh_auth_settings():
     get_auth_settings.cache_clear()
     yield
     get_auth_settings.cache_clear()
+
+
+@pytest.fixture(autouse=True)
+def _fresh_rate_limits():
+    """Auth endpoints are throttled; tests must not inherit each other's hits."""
+    from api.rate_limit import reset_limiters
+
+    reset_limiters()
+    yield
+    reset_limiters()

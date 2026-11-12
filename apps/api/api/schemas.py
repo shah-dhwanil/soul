@@ -139,7 +139,7 @@ class RegisterRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     email: EmailStr
-    password: str = Field(min_length=8)
+    password: str = Field(min_length=8, max_length=1024)
 
     @field_validator("email", mode="before")
     @classmethod
@@ -154,7 +154,7 @@ class LoginRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     email: EmailStr
-    password: str = Field(min_length=1)
+    password: str = Field(min_length=1, max_length=1024)
 
     @field_validator("email", mode="before")
     @classmethod

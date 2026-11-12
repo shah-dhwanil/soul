@@ -212,14 +212,14 @@ class PersonaRepository:
     async def reseed(self, user_id: str, temperament: str) -> dict:
         """Re-seed the persona with a temperament and its default dials.
 
-        The explicit dial values are replaced by the new temperament's
-        defaults; learned dials are left alone, because they were learned
-        rather than chosen.
+        The explicit dial overrides are dropped, so the dials are the new
+        temperament's defaults. Learned dials are left alone, because they
+        were learned rather than chosen.
         """
         persona = await self.get_or_create(user_id)
         seed = asdict(TEMPERAMENTS[temperament].default_dials)
         settings = dict(persona.settings or {})
-        settings["dials"] = dict(seed)
+        settings.pop("dials", None)
         persona.temperament = temperament
         persona.dials = dict(seed)
         persona.settings = settings
