@@ -22,6 +22,37 @@ DATABASE__CHECKPOINTER_DATABASE_URL=postgresql://USER:PASSWORD@HOST/DB?sslmode=r
 
 LangGraph checkpoint tables use **psycopg** (`postgresql://…`), not asyncpg. On first run the app calls `AsyncPostgresSaver.setup()` to create migration tables. Canonical chat history for production should still live in your app database; checkpoints are for graph durability and replay.
 
+## Persona layer
+
+Code lives in [`agent/persona/`](agent/persona/):
+
+- `assets/prompt.md` + `assets/manifest.json` — canonical prompt, versioned and hashed.
+- `constants/` — fixed product constants (`modes`, `dials`, `temperaments`, `banned`, `boundaries`, `crisis`).
+- `loader.py` — loads the bundle and checks drift; `directive.py`, `context.py`, `layers.py`, `render.py`, `template.py` build the per-turn prompt.
+
+### Persona tables
+
+Per-user state lives in four Postgres tables (models in [`agent/pg/models.py`](agent/pg/models.py)): `user_persona` (temperament, dials, stage, dependency level), `user_trait`, `user_signal`, and `user_leaning`. A `detection_job` table queues background detection work. Run `uv run alembic upgrade head` to create them.
+
+### `X-USER-ID`
+
+Every `/v1` API route reads the user from the `X-USER-ID` header. There is **no authentication** (see [ADR 0004](../../docs/adr/0004-x-user-id-without-auth.md)); do not expose the API beyond a trusted network.
+
+### Persona asset hash
+
+`load_persona()` returns the prompt SHA-256 and an `asset_hash` over all asset files. `assert_no_drift()` fails with `PersonaDriftError` if the version differs from `PERSONA_VERSION` or `prompt.md` no longer matches `manifest.json`. Update the manifest whenever the prompt changes.
+
+### Live eval
+
+The 14 blocking probes run against the real stack (Clef, Groq, DB) and need credentials:
+
+```bash
+cd apps/agent
+uv run pytest tests/evals/test_agent_eval_live.py -q -m eval
+```
+
+Boundary integrity, safety routing, and affect-rule adherence must each score 5. Then walk [the release checklist](../../docs/persona-release-checklist.md).
+
 ## HTTP API
 
 The FastAPI app lives in the separate [`soul-api`](../api) package (`apps/api`). See [apps/api/README.md](../api/README.md).
