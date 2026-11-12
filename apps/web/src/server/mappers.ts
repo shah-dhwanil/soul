@@ -12,6 +12,7 @@ import type {
   Conversation,
   Leaning,
   Settings,
+  SettingValue,
   Temperament,
   Trait,
   UserSummary,
@@ -50,11 +51,32 @@ export function toTemperaments(api: {
   return api.temperaments.map(toTemperament)
 }
 
+/**
+ * Settings values are flat primitives; anything else is dropped rather than
+ * carried into the browser.
+ */
+export function toSettingMap(
+  input: Record<string, unknown>,
+): Record<string, SettingValue> {
+  const out: Record<string, SettingValue> = {}
+  for (const [key, value] of Object.entries(input ?? {})) {
+    if (
+      value === null ||
+      typeof value === 'string' ||
+      typeof value === 'number' ||
+      typeof value === 'boolean'
+    ) {
+      out[key] = value
+    }
+  }
+  return out
+}
+
 export function toSettings(api: ApiSettings): Settings {
   return {
-    explicit: api.explicit,
-    learned: api.learned,
-    effective: api.effective,
+    explicit: toSettingMap(api.explicit),
+    learned: toSettingMap(api.learned),
+    effective: toSettingMap(api.effective),
   }
 }
 

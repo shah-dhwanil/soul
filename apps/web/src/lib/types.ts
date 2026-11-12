@@ -54,11 +54,14 @@ export type CheckInMode = 'off' | 'events' | 'occasional'
 /** Emoji use. */
 export type EmojiMode = 'never' | 'only_if_i_use_them'
 
+/** A value a setting can hold. */
+export type SettingValue = string | number | boolean | null
+
 /** The settings view: what was set explicitly, what was learned, what applies. */
 export interface Settings {
-  explicit: Record<string, unknown>
-  learned: Record<string, unknown>
-  effective: Record<string, unknown>
+  explicit: Record<string, SettingValue>
+  learned: Record<string, SettingValue>
+  effective: Record<string, SettingValue>
 }
 
 /** The settable slice of settings. `checkIns` maps to the API's `check_ins`. */

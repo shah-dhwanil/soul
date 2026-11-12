@@ -61,6 +61,20 @@ describe('mappers', () => {
     expect(toSettings(api)).toEqual(api)
   })
 
+  test('drops settings values that are not flat primitives', () => {
+    expect(
+      toSettings({
+        explicit: { address: 'Sam', nested: { a: 1 } },
+        learned: { humor: 5, missing: null },
+        effective: { warmth: 7, flag: true },
+      }),
+    ).toEqual({
+      explicit: { address: 'Sam' },
+      learned: { humor: 5, missing: null },
+      effective: { warmth: 7, flag: true },
+    })
+  })
+
   test('maps traits and leanings, defaulting a missing last_landed to null', () => {
     expect(
       toTrait({

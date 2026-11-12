@@ -3,7 +3,8 @@ import { useState } from 'react'
 import { Button } from '~/components/ui/button'
 import { Input } from '~/components/ui/input'
 import { Label } from '~/components/ui/label'
-import { login, me } from '~/server/auth'
+import { StepAccount } from '~/components/onboarding/StepAccount'
+import { login, me, register } from '~/server/auth'
 
 /** Where the user lands after signing in. */
 function landingPath(next: string | undefined, onboarded: boolean): string {
@@ -21,6 +22,8 @@ function errorMessage(code: string): string {
   switch (code) {
     case 'invalid_credentials':
       return 'That email and password do not match.'
+    case 'email_exists':
+      return 'That email already has an account. Try signing in.'
     case 'rate_limited':
       return 'Too many attempts. Give it a minute and try again.'
     default:
@@ -33,7 +36,7 @@ export const Route = createFileRoute('/login')({
     const next = typeof search.next === 'string' ? search.next : undefined
     return next ? { next } : {}
   },
-  beforeLoad: async ({ location, search }) => {
+  beforeLoad: async ({ search }) => {
     const result = await me()
     const user = result.ok ? result.data : null
     if (user) {
@@ -48,6 +51,7 @@ export const Route = createFileRoute('/login')({
 function LoginPage() {
   const { next } = Route.useSearch()
   const navigate = useNavigate()
+  const [mode, setMode] = useState<'signin' | 'register'>('signin')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -65,6 +69,49 @@ function LoginPage() {
       return
     }
     await navigate({ href: landingPath(next, result.data.onboarded) })
+  }
+
+  async function onRegister(accountEmail: string, accountPassword: string) {
+    if (pending) return
+    setPending(true)
+    setError(null)
+    const result = await register({
+      data: { email: accountEmail, password: accountPassword },
+    })
+    setPending(false)
+    if (!result.ok) {
+      setError(errorMessage(result.code))
+      return
+    }
+    await navigate({ href: landingPath(next, result.data.onboarded) })
+  }
+
+  if (mode === 'register') {
+    return (
+      <div className="mx-auto flex w-full max-w-md flex-col px-6 py-24">
+        <StepAccount
+          variant="register"
+          user={null}
+          pending={pending}
+          error={error}
+          onRegister={onRegister}
+          onContinue={() => undefined}
+        />
+        <p className="mt-6 text-center text-sm text-[var(--wren-ink-muted)]">
+          Already have an account?{' '}
+          <button
+            type="button"
+            className="underline underline-offset-4"
+            onClick={() => {
+              setError(null)
+              setMode('signin')
+            }}
+          >
+            Sign in
+          </button>
+        </p>
+      </div>
+    )
   }
 
   return (
@@ -120,9 +167,16 @@ function LoginPage() {
 
       <p className="mt-6 text-center text-sm text-[var(--wren-ink-muted)]">
         New here?{' '}
-        <a href="/onboarding" className="underline underline-offset-4">
-          Start a conversation
-        </a>
+        <button
+          type="button"
+          className="underline underline-offset-4"
+          onClick={() => {
+            setError(null)
+            setMode('register')
+          }}
+        >
+          Create an account
+        </button>
       </p>
     </div>
   )
