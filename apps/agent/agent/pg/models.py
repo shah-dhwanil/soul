@@ -411,3 +411,29 @@ class UserLeaning(BaseModel):
     )
 
     __table_args__ = (Index("ix_user_leaning_user_status", "user_id", "status"),)
+
+
+class DetectionJob(BaseModel):
+    """Queue row for the detection worker. Holds ids only, never message content."""
+
+    __tablename__ = "detection_job"
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    user_id: Mapped[str] = mapped_column(String, nullable=False)
+    conversation_id: Mapped[UUID] = mapped_column(nullable=False)
+    status: Mapped[str] = mapped_column(String, nullable=False, default="pending")
+    attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    last_error: Mapped[str | None] = mapped_column(String, nullable=True)
+    processed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+    __table_args__ = (
+        Index("ix_detection_job_status_created", "status", "created_at"),
+        Index(
+            "uniq_detection_job_conversation_active",
+            "conversation_id",
+            unique=True,
+            postgresql_where=text("status IN ('pending','processing')"),
+        ),
+    )
