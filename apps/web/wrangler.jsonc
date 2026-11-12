@@ -1,0 +1,12 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "wren-web",
+  "compatibility_date": "2025-11-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "main": "@tanstack/react-start/server-entry",
+  "vars": {
+    // Placeholder for local development. The production value is a secret:
+    //   pnpm --dir apps/web exec wrangler secret put WREN_API_URL
+    "WREN_API_URL": "http://localhost:8010"
+  }
+}
