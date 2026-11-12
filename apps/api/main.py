@@ -18,7 +18,7 @@ from agent.services.memory_worker import MemoryWorker
 from agent.services.recompute import RecomputeWorker
 from agent.services.turns import TurnService
 from api.config import get_auth_settings
-from api.routes import chat, health, users
+from api.routes import auth, chat, health, users
 
 _api_root = Path(__file__).resolve().parent
 load_dotenv(_api_root / ".env")
@@ -79,5 +79,6 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Soul API", version="0.1.0", lifespan=lifespan)
 app.include_router(health.router)
+app.include_router(auth.router)
 app.include_router(chat.router)
 app.include_router(users.router)

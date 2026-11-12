@@ -8,6 +8,7 @@ from agent.repositories.persona import PersonaRepository
 from agent.services.memory import MemoryService
 from agent.services.turns import TurnService
 from api.config import get_auth_settings
+from api.repositories import AccountRepository
 from api.security import decode_token
 
 
@@ -78,6 +79,13 @@ async def get_persona_repo(session: SessionDep) -> PersonaRepository:
 
 
 PersonaRepoDep = Annotated[PersonaRepository, Depends(get_persona_repo)]
+
+
+async def get_account_repo(session: SessionDep) -> AccountRepository:
+    return AccountRepository(session)
+
+
+AccountRepoDep = Annotated[AccountRepository, Depends(get_account_repo)]
 
 
 def get_memory_service(request: Request) -> MemoryService:
