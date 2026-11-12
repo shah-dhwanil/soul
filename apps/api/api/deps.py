@@ -7,6 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from agent.repositories.persona import PersonaRepository
 from agent.services.memory import MemoryService
 from agent.services.turns import TurnService
+from api.config import get_auth_settings
+from api.security import decode_token
 
 
 def get_turn_service(request: Request) -> TurnService:
@@ -20,18 +22,33 @@ TurnServiceDep = Annotated[TurnService, Depends(get_turn_service)]
 
 
 def get_current_user_id(
-    x_user_id: Annotated[str | None, Header(alias="X-USER-ID")] = None,
+    authorization: Annotated[str | None, Header()] = None,
 ) -> str:
-    if x_user_id is None or not x_user_id.strip():
-        raise HTTPException(status_code=400, detail={"code": "missing_user_id"})
-    return x_user_id.strip()
+    """The caller's identity, taken only from a validated access token.
+
+    A missing or malformed `Authorization: Bearer <token>` header is
+    `missing_token`; a token that fails validation (expired, wrong secret,
+    wrong type) is `invalid_token`, so a client can tell "refresh me" from
+    "sign in again".
+    """
+    if not authorization:
+        raise HTTPException(status_code=401, detail={"code": "missing_token"})
+    scheme, _, token = authorization.partition(" ")
+    if scheme.lower() != "bearer" or not token.strip():
+        raise HTTPException(status_code=401, detail={"code": "missing_token"})
+    user_id = decode_token(
+        token.strip(), expected_type="access", settings=get_auth_settings()
+    )
+    if user_id is None:
+        raise HTTPException(status_code=401, detail={"code": "invalid_token"})
+    return user_id
 
 
 CurrentUserId = Annotated[str, Depends(get_current_user_id)]
 
 
 def require_matching_user(user_id: str, current_user_id: CurrentUserId) -> str:
-    """Path `user_id` must equal the X-USER-ID header."""
+    """Path `user_id` must equal the token subject."""
     if user_id != current_user_id:
         raise HTTPException(status_code=400, detail={"code": "user_id_mismatch"})
     return user_id

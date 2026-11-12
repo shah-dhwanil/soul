@@ -17,6 +17,7 @@ from agent.services.memory import MemoryService
 from agent.services.memory_worker import MemoryWorker
 from agent.services.recompute import RecomputeWorker
 from agent.services.turns import TurnService
+from api.config import get_auth_settings
 from api.routes import chat, health, users
 
 _api_root = Path(__file__).resolve().parent
@@ -29,6 +30,9 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     settings = get_settings()
+    # Fail fast: without JWT_SECRET the API cannot validate an access token,
+    # and serving identity it cannot verify is worse than not serving at all.
+    get_auth_settings()
     engine = create_engine(settings)
     session_factory = create_session_factory(engine)
 

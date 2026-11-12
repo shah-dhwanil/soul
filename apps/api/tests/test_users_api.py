@@ -1,6 +1,8 @@
 import pytest
 from fastapi.testclient import TestClient
 
+from tests.helpers import auth_headers, expired_access_token
+
 
 class FakePersonaRepo:
     """In-memory stand-in for PersonaRepository."""
@@ -56,13 +58,34 @@ def test_temperaments_endpoint_lists_four_seeds(client):
     assert all(t["first_line"] for t in body["temperaments"])
 
 
-def test_create_user_requires_user_id_header(client):
+def test_create_user_requires_bearer_token(client):
     resp = client.post("/v1/users", json={"temperament": "steady", "locale": "en-US", "timezone": "UTC"})
-    assert resp.status_code == 400
+    assert resp.status_code == 401
+    assert resp.json()["detail"]["code"] == "missing_token"
+
+
+def test_missing_bearer_token_gets_401(client):
+    resp = client.get("/v1/users/u1/traits")
+    assert resp.status_code == 401
+    assert resp.json()["detail"]["code"] == "missing_token"
+
+
+def test_x_user_id_header_alone_is_rejected(client):
+    resp = client.get("/v1/users/u1/traits", headers={"X-USER-ID": "u1"})
+    assert resp.status_code == 401
+    assert resp.json()["detail"]["code"] == "missing_token"
+
+
+def test_expired_access_token_gets_invalid_token(client):
+    resp = client.get(
+        "/v1/users/u1/traits", headers={"Authorization": expired_access_token("u1")}
+    )
+    assert resp.status_code == 401
+    assert resp.json()["detail"]["code"] == "invalid_token"
 
 
 def test_create_user_is_idempotent(client):
-    headers = {"X-USER-ID": "u1"}
+    headers = auth_headers("u1")
     payload = {"temperament": "steady", "locale": "en-US", "timezone": "UTC"}
     first = client.post("/v1/users", json=payload, headers=headers)
     second = client.post("/v1/users", json=payload, headers=headers)
@@ -73,12 +96,12 @@ def test_create_user_is_idempotent(client):
 
 
 def test_path_and_header_user_id_must_match(client):
-    resp = client.get("/v1/users/u1/traits", headers={"X-USER-ID": "u2"})
+    resp = client.get("/v1/users/u1/traits", headers=auth_headers("u2"))
     assert resp.status_code == 400
 
 
 def test_user_summary_never_exposes_stage_number(client):
-    headers = {"X-USER-ID": "u1"}
+    headers = auth_headers("u1")
     client.post("/v1/users", json={"temperament": "steady", "locale": "en-US", "timezone": "UTC"}, headers=headers)
     resp = client.get("/v1/users/u1", headers=headers)
     assert resp.status_code == 200

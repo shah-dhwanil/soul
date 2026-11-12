@@ -1,8 +1,10 @@
 from datetime import UTC, datetime, timedelta
 
 import jwt
+import pytest
+from pydantic import ValidationError
 
-from api.config import get_auth_settings
+from api.config import AuthSettings, get_auth_settings
 from api.security import (
     create_access_token,
     create_refresh_token,
@@ -10,6 +12,20 @@ from api.security import (
     hash_password,
     verify_password,
 )
+
+
+def test_auth_settings_read_jwt_secret_and_ttls_from_env(monkeypatch):
+    monkeypatch.setenv("JWT_SECRET", "s" * 32)
+    settings = AuthSettings(_env_file=None)
+    assert settings.jwt_secret == "s" * 32
+    assert settings.access_token_ttl_minutes == 15
+    assert settings.refresh_token_ttl_days == 30
+
+
+def test_auth_settings_fail_fast_without_jwt_secret(monkeypatch):
+    monkeypatch.delenv("JWT_SECRET", raising=False)
+    with pytest.raises(ValidationError):
+        AuthSettings(_env_file=None)
 
 
 def test_password_hash_roundtrip():
