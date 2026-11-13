@@ -4,6 +4,9 @@
   "compatibility_date": "2025-11-01",
   "compatibility_flags": ["nodejs_compat"],
   "main": "@tanstack/react-start/server-entry",
+  "observability": {
+		"enabled": true,
+	},
   "vars": {
     // Placeholder for local development. The production value is a secret:
     //   pnpm --dir apps/web exec wrangler secret put WREN_API_URL
