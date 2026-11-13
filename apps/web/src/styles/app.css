@@ -1,0 +1,118 @@
+@import 'tailwindcss' source('../');
+
+/* Wren is a warm pastel product: one light palette, class-based dark mode only. */
+@custom-variant dark (&:is(.dark *));
+
+@layer base {
+  :root {
+    /* The five palette tokens every surface is built from. */
+    --wren-bg: #fdf7f0;
+    --wren-surface: #fffdfa;
+    --wren-ink: #3c3229;
+    --wren-accent: #d99a7a;
+    --wren-accent-soft: #f3ded1;
+
+    /* Supporting steps derived from the five. */
+    --wren-ink-muted: #7a6b5c;
+    --wren-border: #ecdfd2;
+    --wren-accent-ink: #8f5334;
+
+    /* shadcn/ui tokens, themed from the palette above. */
+    --background: var(--wren-bg);
+    --foreground: var(--wren-ink);
+    --card: var(--wren-surface);
+    --card-foreground: var(--wren-ink);
+    --popover: var(--wren-surface);
+    --popover-foreground: var(--wren-ink);
+    --primary: var(--wren-accent);
+    --primary-foreground: var(--wren-ink);
+    --secondary: var(--wren-accent-soft);
+    --secondary-foreground: var(--wren-ink);
+    --muted: #f6ece1;
+    --muted-foreground: var(--wren-ink-muted);
+    --accent: var(--wren-accent-soft);
+    --accent-foreground: var(--wren-ink);
+    --destructive: #b4553f;
+    --border: var(--wren-border);
+    --input: var(--wren-border);
+    --ring: var(--wren-accent);
+
+    --radius: 1rem;
+  }
+
+  html {
+    color-scheme: light;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: var(--wren-bg);
+    color: var(--wren-ink);
+    font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+    font-feature-settings: 'cv11', 'ss01';
+  }
+
+  .font-display {
+    font-family: 'Fraunces', ui-serif, Georgia, serif;
+  }
+
+  ::selection {
+    background-color: var(--wren-accent-soft);
+    color: var(--wren-ink);
+  }
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-wren-bg: var(--wren-bg);
+  --color-wren-surface: var(--wren-surface);
+  --color-wren-ink: var(--wren-ink);
+  --color-wren-ink-muted: var(--wren-ink-muted);
+  --color-wren-accent: var(--wren-accent);
+  --color-wren-accent-soft: var(--wren-accent-soft);
+  --color-wren-accent-ink: var(--wren-accent-ink);
+  --color-wren-border: var(--wren-border);
+
+  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-display: 'Fraunces', ui-serif, Georgia, serif;
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+@layer components {
+  /* Soft organic shapes: the visual signature of the product. */
+  .wren-blob {
+    border-radius: 58% 42% 47% 53% / 52% 46% 54% 48%;
+  }
+
+  .wren-blob-alt {
+    border-radius: 42% 58% 63% 37% / 46% 55% 45% 54%;
+  }
+
+  .wren-card {
+    background-color: var(--wren-surface);
+    border: 1px solid var(--wren-border);
+    border-radius: var(--radius-xl);
+  }
+}

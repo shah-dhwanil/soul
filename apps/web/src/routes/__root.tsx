@@ -1,0 +1,89 @@
+/// <reference types="vite/client" />
+import {
+  HeadContent,
+  Link,
+  Outlet,
+  Scripts,
+  createRootRouteWithContext,
+} from '@tanstack/react-router'
+import { QueryClientProvider } from '@tanstack/react-query'
+import * as React from 'react'
+import { useNavigate, useRouter } from '@tanstack/react-router'
+import type { QueryClient } from '@tanstack/react-query'
+import { AppNav } from '~/components/shared/AppNav'
+import appCss from '~/styles/app.css?url'
+import { logout, me } from '~/server/auth'
+
+export const Route = createRootRouteWithContext<{
+  queryClient: QueryClient
+}>()({
+  loader: async () => {
+    const result = await me()
+    return { user: result.ok ? result.data : null }
+  },
+  head: () => ({
+    meta: [
+      { charSet: 'utf-8' },
+      { name: 'viewport', content: 'width=device-width, initial-scale=1' },
+      { title: 'Wren' },
+      {
+        name: 'description',
+        content:
+          'A steady friend who pays attention, tells you the truth once, and becomes recognizably yours the longer you talk.',
+      },
+    ],
+    links: [
+      { rel: 'stylesheet', href: appCss },
+      { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
+      {
+        rel: 'preconnect',
+        href: 'https://fonts.gstatic.com',
+        crossOrigin: 'anonymous',
+      },
+      {
+        rel: 'stylesheet',
+        href: 'https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&display=swap',
+      },
+    ],
+  }),
+  component: RootComponent,
+})
+
+function RootComponent() {
+  const { queryClient } = Route.useRouteContext()
+  const { user } = Route.useLoaderData()
+  const navigate = useNavigate()
+  const router = useRouter()
+
+  async function signOut() {
+    await logout()
+    await navigate({ href: '/' })
+    // The header reads the session: re-run the root loader.
+    await router.invalidate()
+    await queryClient.resetQueries()
+  }
+
+  return (
+    <html lang="en">
+      <head>
+        <HeadContent />
+      </head>
+      <body className="bg-[var(--wren-bg)] text-[var(--wren-ink)] antialiased">
+        <QueryClientProvider client={queryClient}>
+          <div className="flex min-h-dvh flex-col">
+            <header className="mx-auto flex w-full max-w-5xl items-center justify-between px-6 py-6">
+              <Link to="/" className="font-display text-lg tracking-tight">
+                Wren
+              </Link>
+              <AppNav user={user} onSignOut={signOut} />
+            </header>
+            <main className="flex-1">
+              <Outlet />
+            </main>
+          </div>
+        </QueryClientProvider>
+        <Scripts />
+      </body>
+    </html>
+  )
+}
